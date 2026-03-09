@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JA's Trading PA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --bg: #0a0e0a;
+  --surface: #111611;
+  --surface2: #161e16;
+  --border: #1e2a1e;
+  --text: #c8dcc8;
+  --muted: #4a6b4a;
+  --accent: #00ff88;
+  --accent2: #00ccff;
+  --danger: #ff4444;
+  --mono: 'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; }
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 24px; border-bottom: 1px solid var(--border);
+  background: var(--surface); position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: var(--accent); }
+.logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.connect-btn {
+  font-family: var(--mono); font-size: 0.75rem; padding: 8px 16px;
+  background: transparent; border: 1px solid var(--accent); color: var(--accent);
+  cursor: pointer; transition: all 0.2s;
+}
+.connect-btn:hover, .connect-btn.connected { background: var(--accent); color: var(--bg); }
+.network-badge { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--accent); border: 1px solid var(--border); padding: 4px 10px; }
+.network-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+.main { max-width: 900px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.panel { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+.panel-title { font-size: 0.7rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+/* P&L Cards */
+.pnl-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+.pnl-card { background: var(--surface2); padding: 14px; text-align: center; border: 1px solid var(--border); }
+.pnl-label { font-size: 0.6rem; color: var(--muted); margin-bottom: 6px; letter-spacing: 1px; }
+.pnl-value { font-size: 1rem; color: var(--text); }
+.pnl-value.green { color: var(--accent); }
+.pnl-value.red { color: var(--danger); }
+
+/* Trade items */
+.tx-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.tx-item:last-child { border-bottom: none; }
+.tx-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.tx-pair { font-size: 0.82rem; color: var(--text); font-weight: 600; }
+.tx-amounts { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.tx-badge { font-size: 0.6rem; padding: 2px 8px; background: rgba(0,255,136,0.15); color: var(--accent); border: 1px solid var(--accent); }
+.tx-meta { font-size: 0.65rem; color: var(--muted); display: flex; gap: 12px; margin-top: 4px; }
+.tx-meta a { color: var(--accent2); text-decoration: none; }
+.sync-btn { font-family: var(--mono); font-size: 0.65rem; background: var(--surface2); border: 1px solid var(--border); color: var(--accent); padding: 5px 12px; cursor: pointer; }
+.sync-btn:hover { border-color: var(--accent); }
+.empty-state { text-align: center; padding: 30px; color: var(--muted); font-size: 0.75rem; }
+
+/* Activity log */
+.log-entry { font-size: 0.72rem; padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+.log-time { color: var(--muted); flex-shrink: 0; }
+.log-msg { color: var(--text); }
+.log-msg.success { color: var(--accent); }
+.log-msg.warn { color: #ffaa00; }
+.log-msg.error { color: var(--danger); }
+
+/* Price cards */
+.price-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.price-card { background: var(--surface2); padding: 14px; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s; }
+.price-card:hover { border-color: var(--accent); }
+.price-sym { font-size: 0.65rem; color: var(--muted); margin-bottom: 6px; }
+.price-val { font-size: 0.95rem; color: var(--text); margin-bottom: 4px; }
+.price-change { font-size: 0.7rem; }
+.price-change.up { color: var(--accent); }
+.price-change.down { color: var(--danger); }
+.price-signal { font-size: 0.6rem; margin-top: 6px; padding: 2px 6px; display: inline-block; }
+.price-signal.buy { background: rgba(0,255,136,0.1); color: var(--accent); border: 1px solid var(--accent); }
+.price-signal.sell { background: rgba(255,68,68,0.1); color: var(--danger); border: 1px solid var(--danger); }
+.price-signal.hold { background: rgba(0,204,255,0.1); color: var(--accent2); border: 1px solid var(--accent2); }
+
+/* Chart */
+.chart-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.chart-tab { font-family: var(--mono); font-size: 0.65rem; padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; }
+.chart-tab.active { border-color: var(--accent); color: var(--accent); }
+.chart-wrap { position: relative; height: 280px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    JA's Trading PA
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div class="network-badge" id="networkBadge" style="display:none;">
+      <div class="network-dot"></div>
+      CELO MAINNET
+    </div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">CONNECT WALLET</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- MODULE 1: Trade History & P&L -->
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <div style="font-size:0.7rem;color:var(--muted);letter-spacing:2px;">📊 TRADE HISTORY & P&L</div>
+      <button class="sync-btn" onclick="syncFromCeloScan()" id="syncBtn">🔄 SYNC FROM CHAIN</button>
+    </div>
+    <div id="syncStatus" style="font-size:0.65rem;color:var(--muted);margin-bottom:10px;display:none;"></div>
+
+    <!-- P&L Summary -->
+    <div class="pnl-grid">
+      <div class="pnl-card">
+        <div class="pnl-label">TOTAL TRADES</div>
+        <div class="pnl-value" id="pnlTotalTrades">—</div>
+      </div>
+      <div class="pnl-card">
+        <div class="pnl-label">VOLUME</div>
+        <div class="pnl-value" id="pnlVolume">—</div>
+      </div>
+      <div class="pnl-card">
+        <div class="pnl-label">FX YIELD</div>
+        <div class="pnl-value green" id="pnlFxYield">—</div>
+      </div>
+      <div class="pnl-card">
+        <div class="pnl-label">INVESTED</div>
+        <div class="pnl-value" id="pnlInvested">—</div>
+      </div>
+      <div class="pnl-card">
+        <div class="pnl-label">LAST TRADE</div>
+        <div class="pnl-value" id="pnlLastTrade" style="font-size:0.7rem;">—</div>
+      </div>
+    </div>
+
+    <!-- Trade list -->
+    <div id="txHistory">
+      <div class="empty-state">No trades yet — click SYNC FROM CHAIN to load history</div>
+    </div>
+  </div>
+
+  <!-- MODULE 2: Activity Log -->
+  <div class="panel">
+    <div class="panel-title">🖥 Activity Log</div>
+    <button onclick="sendReportToTelegram()" style="font-family:var(--mono);font-size:0.65rem;background:var(--surface2);border:1px solid var(--border);color:var(--accent2);padding:5px 12px;cursor:pointer;margin-bottom:12px;">📤 SEND REPORT TO TELEGRAM</button>
+    <div id="logEntries" style="max-height:250px;overflow-y:auto;"></div>
+  </div>
+
+  <!-- MODULE 3: CELO Prices -->
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <div style="font-size:0.7rem;color:var(--muted);letter-spacing:2px;">💱 CELO PRICES</div>
+      <div style="font-size:0.65rem;color:var(--muted);cursor:pointer;" onclick="refreshPrices()">⟳ refresh</div>
+    </div>
+    <div class="price-grid">
+      <div class="price-card" id="card-cUSD">
+        <div class="price-sym">CELO/cUSD</div>
+        <div class="price-val" id="price-cUSD">—</div>
+        <div class="price-change" id="change-cUSD">—</div>
+        <div id="signal-cUSD"></div>
+      </div>
+      <div class="price-card" id="card-cEUR">
+        <div class="price-sym">CELO/cEUR</div>
+        <div class="price-val" id="price-cEUR">—</div>
+        <div class="price-change" id="change-cEUR">—</div>
+        <div id="signal-cEUR"></div>
+      </div>
+      <div class="price-card" id="card-cREAL">
+        <div class="price-sym">CELO/cREAL</div>
+        <div class="price-val" id="price-cREAL">—</div>
+        <div class="price-change" id="change-cREAL">—</div>
+        <div id="signal-cREAL"></div>
+      </div>
+      <div class="price-card" id="card-USDC">
+        <div class="price-sym">CELO/USDC</div>
+        <div class="price-val" id="price-USDC">—</div>
+        <div class="price-change" id="change-USDC">—</div>
+        <div id="signal-USDC"></div>
+      </div>
+      <div class="price-card" id="card-USDT">
+        <div class="price-sym">CELO/USDT</div>
+        <div class="price-val" id="price-USDT">—</div>
+        <div class="price-change" id="change-USDT">—</div>
+        <div id="signal-USDT"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODULE 4: CELO Price Chart -->
+  <div class="panel">
+    <div class="panel-title">📈 CELO/USD PRICE CHART</div>
+    <div class="chart-tabs">
+      <button class="chart-tab" onclick="loadChart('1')" id="tab-1">24H</button>
+      <button class="chart-tab active" onclick="loadChart('7')" id="tab-7">7D</button>
+      <button class="chart-tab" onclick="loadChart('30')" id="tab-30">30D</button>
+      <button class="chart-tab" onclick="loadChart('90')" id="tab-90">90D</button>
+      <button class="chart-tab" onclick="loadChart('180')" id="tab-180">180D</button>
+      <button class="chart-tab" onclick="loadChart('365')" id="tab-365">1Y</button>
+      <button class="chart-tab" onclick="loadChart('1095')" id="tab-1095">3Y</button>
+      <button class="chart-tab" onclick="loadChart('max')" id="tab-max">ALL</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div id="chartStatus" style="font-size:0.65rem;color:var(--muted);margin-top:8px;text-align:center;"></div>
+  </div>
+
+</div>
+
+<script>
+const CELO_RPC = 'https://forno.celo.org';
+const TELEGRAM_TOKEN = '8751112209:AAF600GfxRQtVzyOMYr6A8sthVyMWEGxljc';
+const TELEGRAM_CHAT_ID = '2113323141';
+const SAFE_ADDRESS = '0xa7b0cead940056cc9afe8034f1cc507a048be8cf';
+
+const TOKENS = {
+  CELO:  { address: '0x471EcE3750Da237f93B8E339c536989b8978a438', decimals: 18, symbol: 'CELO' },
+  USDT:  { address: '0x617f3112bf5397D0467D315cC709EF968D9ba546', decimals: 6,  symbol: 'USDT' },
+  cUSD:  { address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18, symbol: 'cUSD' },
+  cEUR:  { address: '0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73', decimals: 18, symbol: 'cEUR' },
+  USDC:  { address: '0xef4229c8c3250C675F21BCefa42f58EfbfF6002a', decimals: 6,  symbol: 'USDC' },
+  WBTC:  { address: '0xBAAB46E28388d2779e6E31Fd00cF0e5Ad95E327B', decimals: 8,  symbol: 'WBTC' },
+  WETH:  { address: '0x122013fd7dF1C6F636a5bb8f03108E876548b455', decimals: 18, symbol: 'WETH' },
+  cREAL: { address: '0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787', decimals: 18, symbol: 'cREAL' },
+};
+
+// DEX Router Addresses on Celo
+const UNISWAP_V3_ROUTER = '0x5615CDAb10dc425a742d643d949a7F474C01ABc2';
+const CURVE_ROUTER = '0x7f90122BF0700F9E7e1F688fe926940E8839F353';
+
+// 0x API for Celo (best aggregation across Uniswap V3 + Curve)
+const ZEROX_API = 'https://celo.api.0x.org/swap/v1/quote';
+
+// State
+
+let state = {
+  wallet: null,
+  provider: null,
+  signer: null,
+  selectedRoute: 'auto',
+  slippage: 0.1,
+  quote: null,
+  needsApproval: false,
+  balances: {},
+  txHistory: []
+};
+
+
+
+let priceChart = null;
+let currentChartDays = '7';
+let logEntries = [];
+
+function log(msg, type = 'info') {
+  const now = new Date().toLocaleTimeString();
+  logEntries.unshift({ time: now, msg, type });
+  const el = document.getElementById('logEntries');
+  if (!el) return;
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  el.prepend(div);
+  if (el.children.length > 100) el.removeChild(el.lastChild);
+}
+
+async function connectWallet() {
+  log('Looking for wallet...', 'warn');
+
+  // Wait up to 3 seconds for ethereum to be injected (Opera can be slow)
+  let attempts = 0;
+  while (!window.ethereum && attempts < 15) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+
+  if (!window.ethereum) {
+    log('No wallet detected. Please make sure MetaMask is installed, unlocked, and "Allow access to file URLs" is enabled in Opera extensions settings.', 'error');
+    return;
+  }
+
+  try {
+    log('Requesting wallet connection — approve in MetaMask...', 'warn');
+
+    // Check if already connected first
+    let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    
+    if (!accounts || accounts.length === 0) {
+      accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    }
+
+    if (!accounts || accounts.length === 0) {
+      log('No accounts returned. Please unlock MetaMask and try again.', 'error');
+      return;
+    }
+    state.wallet = accounts[0];
+
+    // Switch to Celo
+    await ensureCeloNetwork();
+
+    const btn = document.getElementById('connectBtn');
+    btn.textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+    btn.classList.add('connected');
+    document.getElementById('networkBadge').style.display = 'flex';
+
+    log(`Connected: ${state.wallet}`, 'success');
+    startPriceRefresh();
+    await fetchBalances();
+
+    window.ethereum.on('accountsChanged', (accounts) => {
+      state.wallet = accounts[0];
+      document.getElementById('connectBtn').textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+      fetchBalances();
+    });
+  } catch (e) {
+    log('Connection failed: ' + e.message, 'error');
+  }
+}
+
+async function ensureCeloNetwork() {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: CELO_CHAIN_ID }],
+    });
+  } catch (e) {
+    if (e.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: CELO_CHAIN_ID,
+          chainName: 'Celo Mainnet',
+          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+          rpcUrls: [CELO_RPC],
+          blockExplorerUrls: ['https://celoscan.io'],
+        }],
+      });
+    }
+  }
+}
+
+async function fetchBalances() {
+  if (!state.wallet) return;
+  const balanceSig = '0x70a08231' + state.wallet.slice(2).padStart(64, '0');
+
+  for (const [symbol, token] of Object.entries(TOKENS)) {
+    try {
+      const result = await rpcCall('eth_call', [{ to: token.address, data: balanceSig }, 'latest']);
+      const raw = BigInt(result);
+      const balance = Number(raw) / Math.pow(10, token.decimals);
+      state.balances[symbol] = balance;
+    } catch (e) {
+      state.balances[symbol] = 0;
+    }
+  }
+  updateBalanceDisplay();
+}
+
+async function sendTelegram(message) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      log(`Telegram error: ${data.description}`, 'error');
+      return false;
+    }
+    return true;
+  } catch(e) {
+    log(`Telegram send failed: ${e.message}`, 'error');
+    return false;
+  }
+}
+
+async function fetchCeloPrice() {
+  const celoAddr = TOKENS['CELO'].address.toLowerCase();
+  const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${celoAddr}`);
+  const data = await res.json();
+  return parseFloat(data?.data?.attributes?.price_usd || 0);
+}
+
+function addTxToHistory(pair, amounts, hash, status, extra = {}) {
+  const history = document.getElementById('txHistory');
+  const panel = document.getElementById('historyPanel');
+  panel.style.display = 'block';
+  const shortHash = hash.slice(0,10) + '...' + hash.slice(-4);
+  const now = new Date().toLocaleString();
+  const celoscanUrl = `https://celoscan.io/tx/${hash}`;
+  
+  // Calculate P&L if we have price info
+  let pnlHtml = '';
+  if (extra.fromUSD && extra.toUSD) {
+    const pnl = extra.toUSD - extra.fromUSD;
+    const pnlPct = ((pnl / extra.fromUSD) * 100).toFixed(2);
+    const cls = pnl >= 0 ? 'up' : 'down';
+    const sign = pnl >= 0 ? '+' : '';
+    pnlHtml = `<span class="tx-pnl ${cls}">${sign}$${pnl.toFixed(2)} (${sign}${pnlPct}%)</span>`;
+  }
+
+  const item = document.createElement('div');
+  item.className = 'tx-item';
+  item.innerHTML = `
+    <div class="tx-item-top">
+      <div>
+        <div style="font-size:0.82rem;color:var(--text);font-weight:600;">${pair}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">${amounts}</div>
+      </div>
+      <div style="text-align:right;">
+        <span class="tx-badge ${status}">${status.toUpperCase()}</span>
+        ${pnlHtml ? `<div style="margin-top:4px;">${pnlHtml}</div>` : ''}
+      </div>
+    </div>
+    <div class="tx-item-detail">
+      <span>🕐 ${now}</span>
+      ${extra.gas ? `<span>⛽ ${extra.gas}</span>` : ''}
+      ${extra.rate ? `<span>📈 ${extra.rate}</span>` : ''}
+      <a href="${celoscanUrl}" target="_blank">🔍 CeloScan ↗</a>
+    </div>
+  `;
+  history.prepend(item);
+
+  // Persist to localStorage
+  const tx = { pair, amounts, hash, status, extra, timestamp: now };
+  state.txHistory.unshift(tx);
+  try { localStorage.setItem('ja_tx_history', JSON.stringify(state.txHistory.slice(0, 50))); } catch(e) {}
+  updatePnlSummary();
+}
+
+function updatePnlSummary() {
+  const txs = state.txHistory || [];
+  const total = txs.length;
+  let fxYield = 0, volume = 0, invested = 0;
+  txs.forEach(t => {
+    if (t.extra && t.extra.fromUSD) { volume += t.extra.fromUSD; invested += t.extra.fromUSD; }
+    else { volume += 100; invested += 100; } // estimate $100 per trade
+    if (t.extra && t.extra.fromUSD && t.extra.toUSD) fxYield += (t.extra.toUSD - t.extra.fromUSD);
+  });
+  const lastTx = txs[0];
+  const lastStr = lastTx ? (lastTx.pair || '').slice(0,12) + '\n' + (lastTx.timestamp || '').slice(0,10) : '—';
+  const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
+  el('pnlTotalTrades', total || '—');
+  el('pnlVolume', total ? '$' + volume.toFixed(0) : '—');
+  el('pnlFxYield', total ? '$' + fxYield.toFixed(4) : '—');
+  el('pnlInvested', total ? '$' + invested.toFixed(0) : '—');
+  el('pnlLastTrade', lastStr);
+  const fxEl = document.getElementById('pnlFxYield');
+  if (fxEl) fxEl.className = 'pnl-value ' + (fxYield >= 0 ? 'green' : 'red');
+}
+
+async function syncFromCeloScan() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+  btn.textContent = '⏳ SYNCING...';
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.textContent = 'Fetching transactions from CeloScan...';
+
+  const SAFE = SAFE_ADDRESS;
+  const API = `https://api.celoscan.io/api?module=account&action=tokentx&address=${SAFE}&startblock=0&endblock=99999999&sort=desc&page=1&apikey=YourApiKeyToken`;
+    // Also try without API key
+    const API2 = `https://explorer.celo.org/mainnet/api?module=account&action=tokentx&address=${SAFE}&sort=desc`;
+
+  try {
+    let data;
+    try {
+      const res = await fetch(API2);
+      data = await res.json();
+    } catch(e) {
+      const res = await fetch(API);
+      data = await res.json();
+    }
+
+    if (!data || !data.result || data.result.length === 0) {
+      // Try celoscan directly
+      try {
+        const res3 = await fetch(`https://api.celoscan.io/api?module=account&action=tokentx&address=${SAFE}&sort=desc&offset=50`);
+        data = await res3.json();
+      } catch(e2) {}
+    }
+
+    if (!data || !data.result || data.result.length === 0) {
+      status.textContent = 'No transactions found. The Safe wallet may have no token transfers yet.';
+      btn.textContent = '🔄 SYNC FROM CHAIN';
+      btn.disabled = false;
+      return;
+    }
+
+    // Clear existing history
+    document.getElementById('txHistory').innerHTML = '';
+    state.txHistory = [];
+
+    // Group by txHash to find swaps (2 token transfers = 1 swap)
+    const grouped = {};
+    data.result.forEach(tx => {
+      if (!grouped[tx.hash]) grouped[tx.hash] = [];
+      grouped[tx.hash].push(tx);
+    });
+
+    let count = 0;
+    Object.entries(grouped).forEach(([hash, txs]) => {
+      if (txs.length < 1) return;
+
+      // Find the token transfers
+      const inTx = txs.find(t => t.to.toLowerCase() === SAFE.toLowerCase());
+      const outTx = txs.find(t => t.from.toLowerCase() === SAFE.toLowerCase());
+
+      let pair, amounts, extra = {};
+
+      if (inTx && outTx) {
+        const inAmt = (parseFloat(inTx.value) / Math.pow(10, parseInt(inTx.tokenDecimal))).toFixed(4);
+        const outAmt = (parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal))).toFixed(4);
+        pair = `${outTx.tokenSymbol} → ${inTx.tokenSymbol}`;
+        amounts = `${outAmt} ${outTx.tokenSymbol} → ${inAmt} ${inTx.tokenSymbol}`;
+      } else if (inTx) {
+        const inAmt = (parseFloat(inTx.value) / Math.pow(10, parseInt(inTx.tokenDecimal))).toFixed(4);
+        pair = `→ ${inTx.tokenSymbol}`;
+        amounts = `Received ${inAmt} ${inTx.tokenSymbol}`;
+      } else if (outTx) {
+        const outAmt = (parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal))).toFixed(4);
+        pair = `${outTx.tokenSymbol} →`;
+        amounts = `Sent ${outAmt} ${outTx.tokenSymbol}`;
+      } else return;
+
+      addTxToHistory(pair, amounts, hash, 'success', extra);
+      count++;
+    });
+
+    status.textContent = `✅ Synced ${count} transactions from blockchain.`;
+    updatePnlSummary();
+  } catch(e) {
+    status.textContent = '❌ Sync failed: ' + e.message;
+  }
+
+  btn.textContent = '🔄 SYNC FROM CHAIN';
+  btn.disabled = false;
+}
+
+
+
+// ============================================================
+// PRICES
+// ============================================================
+const TOKEN_ADDRESSES = {
+  CELO:  '0x471ece3750da237f93b8e339c536989b8978a438',
+  cUSD:  '0x765de816845861e75a25fca122bb6898b8b1282a',
+  cEUR:  '0xd8763cba276a3738e6de85b4b3bf5fded6d6ca73',
+  cREAL: '0xe8537a3d056da446677b9e9d6c5db704eaab4787',
+  USDC:  '0xef4229c8c3250c675f21bcefa42f58efbff6002a',
+  USDT:  '0x617f3112bf5397d0467d315cc709ef968d9ba546',
+};
+
+async function fetchTokenUSD(symbol) {
+  try {
+    const addr = TOKEN_ADDRESSES[symbol];
+    const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${addr}`);
+    const data = await res.json();
+    return {
+      price: parseFloat(data?.data?.attributes?.price_usd || 0),
+      change24h: parseFloat(data?.data?.attributes?.price_percent_change_24h || 0)
+    };
+  } catch(e) { return { price: 0, change24h: 0 }; }
+}
+
+async function refreshPrices() {
+  log('Refreshing CELO prices...');
+  const celoData = await fetchTokenUSD('CELO');
+  const celoUSD = celoData.price;
+  if (!celoUSD) { log('Price fetch failed', 'error'); return; }
+
+  const pairs = ['cUSD', 'cEUR', 'cREAL', 'USDC', 'USDT'];
+  for (const sym of pairs) {
+    try {
+      const tokenData = await fetchTokenUSD(sym);
+      const tokenUSD = tokenData.price;
+      const celoInToken = tokenUSD > 0 ? celoUSD / tokenUSD : 0;
+      const change = celoData.change24h;
+
+      const priceEl = document.getElementById(`price-${sym}`);
+      const changeEl = document.getElementById(`change-${sym}`);
+      const signalEl = document.getElementById(`signal-${sym}`);
+
+      if (priceEl) priceEl.textContent = celoInToken > 0 ? celoInToken.toFixed(4) : '—';
+      if (changeEl) {
+        const sign = change >= 0 ? '+' : '';
+        changeEl.textContent = `${sign}${change.toFixed(2)}% 24h`;
+        changeEl.className = `price-change ${change >= 0 ? 'up' : 'down'}`;
+      }
+      if (signalEl) {
+        let signal = 'HOLD', cls = 'hold';
+        if (change <= -5) { signal = 'BUY'; cls = 'buy'; }
+        else if (change >= 10) { signal = 'SELL'; cls = 'sell'; }
+        signalEl.innerHTML = `<span class="price-signal ${cls}">${signal}</span>`;
+      }
+    } catch(e) {}
+  }
+  log(`CELO: $${celoUSD.toFixed(4)} USD`, 'success');
+}
+
+// ============================================================
+// CHART
+// ============================================================
+async function loadChart(days) {
+  currentChartDays = days;
+  // Update tabs
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.getElementById(`tab-${days}`);
+  if (activeTab) activeTab.classList.add('active');
+
+  const statusEl = document.getElementById('chartStatus');
+  if (statusEl) statusEl.textContent = 'Loading chart data...';
+
+  try {
+    const celoId = 'celo';
+    const url = days === 'max'
+      ? `https://api.coingecko.com/api/v3/coins/${celoId}/market_chart?vs_currency=usd&days=max`
+      : `https://api.coingecko.com/api/v3/coins/${celoId}/market_chart?vs_currency=usd&days=${days}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.prices || data.prices.length === 0) {
+      if (statusEl) statusEl.textContent = 'No chart data available.';
+      return;
+    }
+
+    const labels = data.prices.map(p => {
+      const d = new Date(p[0]);
+      if (days === '1') return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return d.toLocaleDateString([], {month:'short', day:'numeric'});
+    });
+    const prices = data.prices.map(p => p[1]);
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    if (priceChart) priceChart.destroy();
+
+    const startPrice = prices[0];
+    const endPrice = prices[prices.length - 1];
+    const isUp = endPrice >= startPrice;
+    const lineColor = isUp ? '#00ff88' : '#ff4444';
+    const fillColor = isUp ? 'rgba(0,255,136,0.08)' : 'rgba(255,68,68,0.08)';
+
+    priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: prices,
+          borderColor: lineColor,
+          backgroundColor: fillColor,
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: {
+            label: ctx => `$${ctx.parsed.y.toFixed(4)}`
+          },
+          backgroundColor: '#161e16',
+          borderColor: '#1e2a1e',
+          borderWidth: 1,
+          titleColor: '#4a6b4a',
+          bodyColor: '#c8dcc8',
+        }},
+        scales: {
+          x: { ticks: { color: '#4a6b4a', font: { size: 10, family: 'Courier New' }, maxTicksLimit: 8 }, grid: { color: '#1e2a1e' } },
+          y: { ticks: { color: '#4a6b4a', font: { size: 10, family: 'Courier New' }, callback: v => '$' + v.toFixed(3) }, grid: { color: '#1e2a1e' } }
+        }
+      }
+    });
+
+    const pctChange = ((endPrice - startPrice) / startPrice * 100).toFixed(2);
+    const sign = pctChange >= 0 ? '+' : '';
+    if (statusEl) statusEl.textContent = `Current: $${endPrice.toFixed(4)} | Change: ${sign}${pctChange}% | High: $${Math.max(...prices).toFixed(4)} | Low: $${Math.min(...prices).toFixed(4)}`;
+    log(`Chart loaded: CELO ${sign}${pctChange}% over ${days === 'max' ? 'all time' : days + ' days'}`);
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Chart load failed. CoinGecko may be rate limiting — try again in a moment.';
+    log('Chart error: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// SEND REPORT
+// ============================================================
+async function sendReportToTelegram() {
+  const txs = state.txHistory || [];
+  const report = `📊 <b>JA Trading PA — Manual Report</b>\n\nTrades: ${txs.length}\nLast: ${txs[0] ? txs[0].pair : 'none'}\n\n🤖 Server running 24/7`;
+  await sendTelegram(report);
+  log('Report sent to Telegram', 'success');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load', () => {
+  log('JA Trading PA loaded — server running 24/7', 'success');
+  refreshPrices();
+  loadChart('7');
+  setInterval(refreshPrices, 60000);
+  // Load saved tx history
+  try {
+    const saved = JSON.parse(localStorage.getItem('ja_tx_history') || '[]');
+    if (saved.length > 0) {
+      state.txHistory = saved;
+      document.getElementById('txHistory').innerHTML = '';
+      saved.forEach(tx => addTxToHistory(tx.pair, tx.amounts, tx.hash, tx.status, tx.extra || {}));
+      updatePnlSummary();
+    }
+  } catch(e) {}
+});
+
+</script>
+</body>
+</html>
