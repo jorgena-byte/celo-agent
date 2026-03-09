@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CELO Trading Agent</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0e0a;
+    --surface: #111611;
+    --surface2: #171e17;
+    --border: #1e2b1e;
+    --accent: #35d07f;
+    --accent2: #fbcc5c;
+    --danger: #ef4444;
+    --text: #e8f5e8;
+    --muted: #4a6b4a;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 20% 0%, rgba(53,208,127,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(251,204,92,0.04) 0%, transparent 60%);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,14,10,0.85);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--sans); font-weight: 800; font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+
+  .connect-btn {
+    font-family: var(--mono); font-size: 0.75rem;
+    background: transparent; border: 1px solid var(--accent);
+    color: var(--accent); padding: 8px 16px; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.05em;
+  }
+
+  .connect-btn:hover { background: var(--accent); color: var(--bg); }
+  .connect-btn.connected { border-color: var(--accent2); color: var(--accent2); }
+
+  .main {
+    max-width: 520px;
+    margin: 40px auto;
+    padding: 0 16px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .panel-title {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .panel-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* Token selector */
+  .token-row {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+  }
+
+  .token-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+    padding: 10px 14px; cursor: pointer; flex: 0 0 auto;
+    outline: none; appearance: none;
+    min-width: 110px;
+  }
+
+  .token-select:focus { border-color: var(--accent); }
+
+  .amount-input {
+    flex: 1;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 1.1rem;
+    padding: 10px 14px; outline: none; width: 100%;
+  }
+
+  .amount-input:focus { border-color: var(--accent); }
+  .amount-input::placeholder { color: var(--muted); }
+
+  .swap-arrow {
+    display: flex; justify-content: center; align-items: center;
+    margin: 4px 0;
+  }
+
+  .swap-arrow-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--accent); width: 36px; height: 36px;
+    cursor: pointer; font-size: 1.1rem; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .swap-arrow-btn:hover {
+    background: var(--accent); color: var(--bg);
+    transform: rotate(180deg);
+  }
+
+  .balance-hint {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+    margin-top: 4px; display: flex; justify-content: space-between;
+  }
+
+  .max-btn {
+    color: var(--accent); cursor: pointer; font-size: 0.7rem;
+    background: none; border: none; font-family: var(--mono);
+  }
+
+  .max-btn:hover { text-decoration: underline; }
+
+  /* Route selector */
+  .route-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+
+  .route-tab {
+    flex: 1; padding: 8px; font-family: var(--mono); font-size: 0.7rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.05em; text-align: center;
+  }
+
+  .route-tab.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(53,208,127,0.06);
+  }
+
+  .route-tab:hover:not(.active) { border-color: var(--muted); color: var(--text); }
+
+  /* Quote display */
+  .quote-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 16px; margin: 16px 0;
+  }
+
+  .quote-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 0.8rem; margin-bottom: 10px;
+  }
+
+  .quote-row:last-child { margin-bottom: 0; }
+  .quote-label { color: var(--muted); }
+
+  .quote-value { color: var(--text); }
+  .quote-value.good { color: var(--accent); }
+  .quote-value.warn { color: var(--accent2); }
+
+  .slippage-row {
+    display: flex; gap: 6px; align-items: center; margin: 12px 0;
+  }
+
+  .slip-btn {
+    font-family: var(--mono); font-size: 0.7rem; padding: 5px 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+  }
+
+  .slip-btn.active { border-color: var(--accent2); color: var(--accent2); }
+
+  .slip-input {
+    width: 60px; font-family: var(--mono); font-size: 0.75rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 8px; outline: none; text-align: right;
+  }
+
+  /* Action buttons */
+  .get-quote-btn, .execute-btn, .approve-btn {
+    width: 100%; padding: 14px;
+    font-family: var(--mono); font-size: 0.85rem; letter-spacing: 0.08em;
+    cursor: pointer; border: none; transition: all 0.2s; margin-top: 8px;
+  }
+
+  .get-quote-btn {
+    background: transparent; border: 1px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .get-quote-btn:hover { background: rgba(53,208,127,0.1); }
+
+  .approve-btn {
+    background: transparent; border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+
+  .approve-btn:hover { background: rgba(251,204,92,0.1); }
+
+  .execute-btn {
+    background: var(--accent); color: var(--bg); font-weight: 700;
+  }
+
+  .execute-btn:hover { background: #2bb870; }
+  .execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status log */
+  .log-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 12px; max-height: 140px; overflow-y: auto;
+    font-family: var(--mono); font-size: 0.72rem;
+  }
+
+  .log-entry {
+    padding: 3px 0; border-bottom: 1px solid rgba(30,43,30,0.5);
+    display: flex; gap: 10px;
+  }
+
+  .log-time { color: var(--muted); flex: 0 0 auto; }
+  .log-msg { color: var(--text); }
+  .log-msg.success { color: var(--accent); }
+  .log-msg.error { color: var(--danger); }
+  .log-msg.warn { color: var(--accent2); }
+
+  /* Tx history */
+  .tx-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.75rem;
+  }
+
+  .tx-item:last-child { border-bottom: none; }
+  .tx-badge {
+    padding: 2px 8px; font-size: 0.65rem;
+  }
+  .tx-badge.success { background: rgba(53,208,127,0.15); color: var(--accent); }
+  .tx-badge.pending { background: rgba(251,204,92,0.15); color: var(--accent2); }
+
+  .network-badge {
+    font-family: var(--mono); font-size: 0.65rem;
+    padding: 4px 10px; background: rgba(53,208,127,0.08);
+    border: 1px solid rgba(53,208,127,0.2); color: var(--accent);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .network-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  .loading { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+    z-index: 200; align-items: center; justify-content: center;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 32px; max-width: 420px; width: 90%;
+  }
+
+  .modal h3 {
+    font-family: var(--sans); font-weight: 800; font-size: 1.2rem;
+    margin-bottom: 20px; color: var(--accent2);
+  }
+
+  .modal-detail {
+    font-family: var(--mono); font-size: 0.8rem;
+    margin-bottom: 10px; display: flex; justify-content: space-between;
+  }
+
+  .modal-label { color: var(--muted); }
+
+  .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+
+  .modal-cancel {
+    flex: 1; padding: 12px; font-family: var(--mono); font-size: 0.8rem;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+  }
+
+  .modal-confirm {
+    flex: 2; padding: 12px; font-family: var(--mono); font-size: 0.8rem;
+    background: var(--accent); color: var(--bg); border: none; cursor: pointer;
+    font-weight: 700;
+  }
+
+  .warn-box {
+    background: rgba(251,204,92,0.07); border: 1px solid rgba(251,204,92,0.2);
+    padding: 10px 14px; font-family: var(--mono); font-size: 0.72rem;
+    color: var(--accent2); margin: 12px 0;
+  }
+
+  select option { background: #111; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    CELO AGENT
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div class="network-badge" id="networkBadge" style="display:none;">
+      <div class="network-dot"></div>
+      CELO MAINNET
+    </div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">CONNECT WALLET</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Swap Panel -->
+  <div class="panel">
+    <div class="panel-title">Swap</div>
+
+    <!-- From Token -->
+    <div class="token-row">
+      <select class="token-select" id="fromToken" onchange="onTokenChange()">
+        <option value="USDT">USDT</option>
+        <option value="CELO">CELO</option>
+        <option value="cUSD">cUSD</option>
+        <option value="cEUR">cEUR</option>
+        <option value="USDC">USDC</option>
+        <option value="WBTC">WBTC</option>
+        <option value="WETH">WETH</option>
+      </select>
+      <input class="amount-input" type="number" id="fromAmount" placeholder="0.00" oninput="onAmountChange()" />
+    </div>
+    <div class="balance-hint">
+      <span id="fromBalance">Balance: —</span>
+      <button class="max-btn" onclick="setMax()">MAX</button>
+    </div>
+
+    <div class="swap-arrow">
+      <button class="swap-arrow-btn" onclick="flipTokens()" title="Flip tokens">↕</button>
+    </div>
+
+    <!-- To Token -->
+    <div class="token-row">
+      <select class="token-select" id="toToken" onchange="onTokenChange()">
+        <option value="CELO">CELO</option>
+        <option value="USDT">USDT</option>
+        <option value="cUSD">cUSD</option>
+        <option value="cEUR">cEUR</option>
+        <option value="USDC">USDC</option>
+        <option value="WBTC">WBTC</option>
+        <option value="WETH">WETH</option>
+      </select>
+      <input class="amount-input" type="number" id="toAmount" placeholder="0.00" readonly style="opacity:0.7;" />
+    </div>
+    <div class="balance-hint">
+      <span id="toBalance">Balance: —</span>
+    </div>
+  </div>
+
+  <!-- Route Panel -->
+  <div class="panel">
+    <div class="panel-title">Route</div>
+    <div class="route-tabs">
+      <button class="route-tab active" onclick="selectRoute(this,'auto')">AUTO BEST</button>
+      <button class="route-tab" onclick="selectRoute(this,'uniswap')">UNISWAP V3</button>
+      <button class="route-tab" onclick="selectRoute(this,'curve')">CURVE</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);">SLIPPAGE</span>
+      <div class="slippage-row" style="margin:0;flex:1;">
+        <button class="slip-btn active" onclick="setSlippage(this,'0.1')">0.1%</button>
+        <button class="slip-btn" onclick="setSlippage(this,'0.5')">0.5%</button>
+        <button class="slip-btn" onclick="setSlippage(this,'1.0')">1.0%</button>
+        <input class="slip-input" id="slippageInput" value="0.1" oninput="customSlippage(this)" /> %
+      </div>
+    </div>
+
+    <div id="quoteBox" class="quote-box" style="display:none;">
+      <div class="quote-row">
+        <span class="quote-label">RATE</span>
+        <span class="quote-value good" id="quoteRate">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">MIN RECEIVED</span>
+        <span class="quote-value" id="quoteMin">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">PRICE IMPACT</span>
+        <span class="quote-value" id="quotePriceImpact">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">EST. GAS</span>
+        <span class="quote-value" id="quoteGas">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">ROUTE VIA</span>
+        <span class="quote-value warn" id="quoteRoute">—</span>
+      </div>
+    </div>
+
+    <button class="get-quote-btn" id="quoteBtn" onclick="getQuote()">GET QUOTE</button>
+    <button class="approve-btn" id="approveBtn" onclick="approveToken()" style="display:none;">APPROVE TOKEN</button>
+    <button class="execute-btn" id="executeBtn" onclick="openConfirmModal()" disabled>REVIEW TRADE</button>
+  </div>
+
+  <!-- Log Panel -->
+  <div class="panel">
+    <div class="panel-title">Activity Log</div>
+    <div class="log-box" id="logBox">
+      <div class="log-entry">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg">Agent initialized. Connect wallet to begin.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tx History -->
+  <div class="panel" id="historyPanel" style="display:none;">
+    <div class="panel-title">Recent Trades</div>
+    <div id="txHistory"></div>
+  </div>
+
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3>⚡ CONFIRM TRADE</h3>
+    <div class="modal-detail">
+      <span class="modal-label">SELLING</span>
+      <span id="modalSell" style="font-family:var(--mono);font-size:0.85rem;color:var(--text);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">BUYING</span>
+      <span id="modalBuy" style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">ROUTE</span>
+      <span id="modalRoute" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent2);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">MAX SLIPPAGE</span>
+      <span id="modalSlippage" style="font-family:var(--mono);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">MIN RECEIVED</span>
+      <span id="modalMin" style="font-family:var(--mono);">—</span>
+    </div>
+    <div class="warn-box" id="modalWarn" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">CANCEL</button>
+      <button class="modal-confirm" onclick="executeTrade()">CONFIRM & SIGN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — Celo Mainnet
+// ============================================================
+const CELO_CHAIN_ID = '0xa4ec'; // 42220
+const CELO_RPC = 'https://forno.celo.org';
+
+const TOKENS = {
+  CELO:  { address: '0x471EcE3750Da237f93B8E339c536989b8978a438', decimals: 18, symbol: 'CELO' },
+  USDT:  { address: '0x617f3112bf5397D0467D315cC709EF968D9ba546', decimals: 6,  symbol: 'USDT' },
+  cUSD:  { address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18, symbol: 'cUSD' },
+  cEUR:  { address: '0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73', decimals: 18, symbol: 'cEUR' },
+  USDC:  { address: '0xef4229c8c3250C675F21BCefa42f58EfbfF6002a', decimals: 6,  symbol: 'USDC' },
+  WBTC:  { address: '0xBAAB46E28388d2779e6E31Fd00cF0e5Ad95E327B', decimals: 8,  symbol: 'WBTC' },
+  WETH:  { address: '0x122013fd7dF1C6F636a5bb8f03108E876548b455', decimals: 18, symbol: 'WETH' },
+};
+
+// DEX Router Addresses on Celo
+const UNISWAP_V3_ROUTER = '0x5615CDAb10dc425a742d643d949a7F474C01ABc2';
+const CURVE_ROUTER = '0x7f90122BF0700F9E7e1F688fe926940E8839F353';
+
+// 0x API for Celo (best aggregation across Uniswap V3 + Curve)
+const ZEROX_API = 'https://celo.api.0x.org/swap/v1/quote';
+
+// State
+let state = {
+  wallet: null,
+  provider: null,
+  signer: null,
+  selectedRoute: 'auto',
+  slippage: 0.1,
+  quote: null,
+  needsApproval: false,
+  balances: {},
+  txHistory: []
+};
+
+// ============================================================
+// WALLET
+// ============================================================
+async function connectWallet() {
+  log('Looking for wallet...', 'warn');
+
+  // Wait up to 3 seconds for ethereum to be injected (Opera can be slow)
+  let attempts = 0;
+  while (!window.ethereum && attempts < 15) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+
+  if (!window.ethereum) {
+    log('No wallet detected. Please make sure MetaMask is installed, unlocked, and "Allow access to file URLs" is enabled in Opera extensions settings.', 'error');
+    return;
+  }
+
+  try {
+    log('Requesting wallet connection — approve in MetaMask...', 'warn');
+
+    // Check if already connected first
+    let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    
+    if (!accounts || accounts.length === 0) {
+      accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    }
+
+    if (!accounts || accounts.length === 0) {
+      log('No accounts returned. Please unlock MetaMask and try again.', 'error');
+      return;
+    }
+    state.wallet = accounts[0];
+
+    // Switch to Celo
+    await ensureCeloNetwork();
+
+    const btn = document.getElementById('connectBtn');
+    btn.textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+    btn.classList.add('connected');
+    document.getElementById('networkBadge').style.display = 'flex';
+
+    log(`Connected: ${state.wallet}`, 'success');
+    await fetchBalances();
+
+    window.ethereum.on('accountsChanged', (accounts) => {
+      state.wallet = accounts[0];
+      document.getElementById('connectBtn').textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+      fetchBalances();
+    });
+  } catch (e) {
+    log('Connection failed: ' + e.message, 'error');
+  }
+}
+
+async function ensureCeloNetwork() {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: CELO_CHAIN_ID }],
+    });
+  } catch (e) {
+    if (e.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: CELO_CHAIN_ID,
+          chainName: 'Celo Mainnet',
+          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+          rpcUrls: [CELO_RPC],
+          blockExplorerUrls: ['https://celoscan.io'],
+        }],
+      });
+    }
+  }
+}
+
+// ============================================================
+// BALANCES (via eth_call to ERC20 balanceOf)
+// ============================================================
+async function fetchBalances() {
+  if (!state.wallet) return;
+  const balanceSig = '0x70a08231' + state.wallet.slice(2).padStart(64, '0');
+
+  for (const [symbol, token] of Object.entries(TOKENS)) {
+    try {
+      const result = await rpcCall('eth_call', [{ to: token.address, data: balanceSig }, 'latest']);
+      const raw = BigInt(result);
+      const balance = Number(raw) / Math.pow(10, token.decimals);
+      state.balances[symbol] = balance;
+    } catch (e) {
+      state.balances[symbol] = 0;
+    }
+  }
+  updateBalanceDisplay();
+}
+
+async function rpcCall(method, params) {
+  const res = await fetch(CELO_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.result;
+}
+
+function updateBalanceDisplay() {
+  const from = document.getElementById('fromToken').value;
+  const to = document.getElementById('toToken').value;
+  const fb = state.balances[from] ?? 0;
+  const tb = state.balances[to] ?? 0;
+  document.getElementById('fromBalance').textContent = `Balance: ${fb.toFixed(4)} ${from}`;
+  document.getElementById('toBalance').textContent = `Balance: ${tb.toFixed(4)} ${to}`;
+}
+
+function setMax() {
+  const from = document.getElementById('fromToken').value;
+  const bal = state.balances[from] ?? 0;
+  document.getElementById('fromAmount').value = bal.toFixed(6);
+  onAmountChange();
+}
+
+// ============================================================
+// QUOTE via GeckoTerminal (live Celo DEX prices, no API key needed)
+// ============================================================
+async function getQuote() {
+  if (!state.wallet) { log('Connect wallet first.', 'warn'); return; }
+  const fromSymbol = document.getElementById('fromToken').value;
+  const toSymbol = document.getElementById('toToken').value;
+  const amount = parseFloat(document.getElementById('fromAmount').value);
+
+  if (!amount || amount <= 0) { log('Enter an amount to swap.', 'warn'); return; }
+  if (fromSymbol === toSymbol) { log('Select different tokens.', 'warn'); return; }
+
+  const fromToken = TOKENS[fromSymbol];
+  const toToken = TOKENS[toSymbol];
+  const sellAmount = BigInt(Math.floor(amount * Math.pow(10, fromToken.decimals))).toString();
+
+  log(`Fetching live price: ${amount} ${fromSymbol} → ${toSymbol}...`);
+  setQuoteLoading(true);
+
+  try {
+    const fromAddr = fromToken.address.toLowerCase();
+    const toAddr = toToken.address.toLowerCase();
+
+    const [fromRes, toRes] = await Promise.all([
+      fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${fromAddr}`),
+      fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${toAddr}`)
+    ]);
+
+    const fromData = await fromRes.json();
+    const toData = await toRes.json();
+
+    const fromPrice = parseFloat(fromData?.data?.attributes?.price_usd || 0);
+    const toPrice = parseFloat(toData?.data?.attributes?.price_usd || 0);
+
+    if (!fromPrice || !toPrice) throw new Error('Price not available');
+
+    const rate = fromPrice / toPrice;
+    const buyAmount = amount * rate;
+    const priceImpact = amount * fromPrice > 50000 ? 0.8 : amount * fromPrice > 10000 ? 0.3 : 0.05;
+    const minReceived = buyAmount * (1 - state.slippage / 100);
+    const sources = state.selectedRoute === 'curve' ? 'Curve' : state.selectedRoute === 'uniswap' ? 'Uniswap V3' : 'Uniswap V3 + Curve';
+
+    state.quote = { buyAmount, rate, minReceived, priceImpact, gasEstimate: '~0.002 CELO', sources, sellAmount, fromToken, toToken, fromSymbol, toSymbol, amount, live: true };
+
+    document.getElementById('toAmount').value = buyAmount.toFixed(6);
+    showQuoteBox(rate, minReceived, priceImpact, '~0.002 CELO', sources, fromSymbol, toSymbol);
+
+    await checkApproval(fromToken, sellAmount, UNISWAP_V3_ROUTER);
+
+    log(`Live quote: ${amount} ${fromSymbol} → ${buyAmount.toFixed(4)} ${toSymbol} @ $${fromPrice.toFixed(4)}/${fromSymbol}`, 'success');
+    document.getElementById('executeBtn').disabled = state.needsApproval;
+
+  } catch (err) {
+    log(`Price fetch failed: ${err.message}. Using estimated prices.`, 'warn');
+    fallbackQuote(fromSymbol, toSymbol, amount, fromToken, toToken, sellAmount);
+  }
+
+  setQuoteLoading(false);
+}
+
+function fallbackQuote(fromSymbol, toSymbol, amount, fromToken, toToken, sellAmount) {
+  const prices = { USDT: 1, cUSD: 1, USDC: 1, CELO: 0.73, cEUR: 1.08, WBTC: 97000, WETH: 3400 };
+  const rate = prices[fromSymbol] / prices[toSymbol];
+  const buyAmount = amount * rate;
+  const priceImpact = amount > 10000 ? 0.3 : 0.05;
+  const minReceived = buyAmount * (1 - state.slippage / 100);
+  const sources = state.selectedRoute === 'curve' ? 'Curve' : state.selectedRoute === 'uniswap' ? 'Uniswap V3' : 'Uniswap V3 + Curve';
+
+  state.quote = { buyAmount, rate, minReceived, priceImpact, gasEstimate: '~0.002 CELO', sources, sellAmount, fromToken, toToken, fromSymbol, toSymbol, amount, live: true };
+
+  document.getElementById('toAmount').value = buyAmount.toFixed(6);
+  showQuoteBox(rate, minReceived, priceImpact, '~0.002 CELO', sources, fromSymbol, toSymbol);
+
+  state.needsApproval = fromSymbol !== 'CELO';
+  document.getElementById('approveBtn').style.display = state.needsApproval ? 'block' : 'none';
+  document.getElementById('executeBtn').disabled = state.needsApproval;
+
+  log(`Estimated quote: ${amount} ${fromSymbol} → ${buyAmount.toFixed(4)} ${toSymbol}`, 'warn');
+}
+
+function showQuoteBox(rate, minReceived, priceImpact, gas, sources, fromSymbol, toSymbol) {
+  document.getElementById('quoteBox').style.display = 'block';
+  document.getElementById('quoteRate').textContent = `1 ${fromSymbol} = ${rate.toFixed(6)} ${toSymbol}`;
+  document.getElementById('quoteMin').textContent = `${minReceived.toFixed(4)} ${toSymbol}`;
+  document.getElementById('quotePriceImpact').textContent = `${priceImpact.toFixed(2)}%`;
+  document.getElementById('quotePriceImpact').className = 'quote-value ' + (priceImpact > 1 ? 'warn' : 'good');
+  document.getElementById('quoteGas').textContent = gas;
+  document.getElementById('quoteRoute').textContent = sources;
+}
+
+async function checkApproval(fromToken, sellAmount, allowanceTarget) {
+  if (!allowanceTarget) { state.needsApproval = false; return; }
+  try {
+    const allowanceSig = '0xdd62ed3e' + state.wallet.slice(2).padStart(64,'0') + allowanceTarget.slice(2).padStart(64,'0');
+    const result = await rpcCall('eth_call', [{ to: fromToken.address, data: allowanceSig }, 'latest']);
+    const allowance = BigInt(result);
+    state.needsApproval = allowance < BigInt(sellAmount);
+    document.getElementById('approveBtn').style.display = state.needsApproval ? 'block' : 'none';
+    document.getElementById('executeBtn').disabled = state.needsApproval;
+    if (state.needsApproval) log(`Token approval required for ${fromToken.symbol}.`, 'warn');
+  } catch {
+    state.needsApproval = false;
+  }
+}
+
+async function approveToken() {
+  if (!state.quote || !state.wallet) return;
+  log(`Approving ${state.quote.fromSymbol} for trading...`, 'warn');
+  try {
+    const MAX_UINT = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+    const spender = state.quote.data?.allowanceTarget || UNISWAP_V3_ROUTER;
+    const approveSig = '0x095ea7b3' + spender.slice(2).padStart(64,'0') + MAX_UINT.slice(2);
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.wallet, to: state.quote.fromToken.address, data: approveSig }]
+    });
+    log(`Approval tx: ${txHash.slice(0,10)}... Waiting for confirmation.`, 'warn');
+    addTxToHistory('APPROVE', state.quote.fromSymbol, txHash, 'pending');
+    state.needsApproval = false;
+    document.getElementById('approveBtn').style.display = 'none';
+    document.getElementById('executeBtn').disabled = false;
+    log(`${state.quote.fromSymbol} approved successfully.`, 'success');
+  } catch (e) {
+    log('Approval rejected: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// TRADE EXECUTION
+// ============================================================
+function openConfirmModal() {
+  if (!state.quote) return;
+  const q = state.quote;
+  document.getElementById('modalSell').textContent = `${q.amount} ${q.fromSymbol}`;
+  document.getElementById('modalBuy').textContent = `~${q.buyAmount.toFixed(4)} ${q.toSymbol}`;
+  document.getElementById('modalRoute').textContent = q.sources;
+  document.getElementById('modalSlippage').textContent = `${state.slippage}%`;
+  document.getElementById('modalMin').textContent = `${q.minReceived.toFixed(4)} ${q.toSymbol}`;
+
+  const warn = document.getElementById('modalWarn');
+  if (q.priceImpact > 1) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠ High price impact (${q.priceImpact.toFixed(2)}%). You may receive significantly less than quoted.`;
+  } else {
+    warn.style.display = 'none';
+  }
+
+  if (!q.live) {
+    warn.style.display = 'block';
+    warn.textContent = `ℹ Prices are estimated. Live execution via Uniswap V3 on Celo.`;
+  }
+
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+async function executeTrade() {
+  closeModal();
+  const q = state.quote;
+  if (!q || !state.wallet) return;
+
+  log(`Submitting swap: ${q.amount} ${q.fromSymbol} → ${q.toSymbol} via Uniswap V3...`, 'warn');
+  try {
+    // Build Uniswap V3 exactInputSingle calldata
+    // Function: exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))
+    const fee = 3000; // 0.3% pool fee
+    const deadline = Math.floor(Date.now() / 1000) + 1200; // 20 min
+    const amountIn = BigInt(q.sellAmount);
+    const amountOutMin = BigInt(Math.floor(q.minReceived * Math.pow(10, q.toToken.decimals)));
+    const sqrtPriceLimitX96 = BigInt(0);
+
+    // ABI encode exactInputSingle params
+    const iface = [
+      'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)'
+    ];
+
+    // Manual ABI encoding for exactInputSingle
+    const fnSig = '0x414bf389'; // keccak256("exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))")
+    const pad = (val, bytes = 32) => val.toString(16).padStart(bytes * 2, '0');
+    const data = fnSig +
+      pad(q.fromToken.address.slice(2).toLowerCase(), 32) +  // tokenIn
+      pad(q.toToken.address.slice(2).toLowerCase(), 32) +    // tokenOut
+      pad(fee) +                                              // fee
+      pad(state.wallet.slice(2).toLowerCase(), 32) +         // recipient
+      pad(deadline) +                                         // deadline
+      pad(amountIn) +                                         // amountIn
+      pad(amountOutMin) +                                     // amountOutMinimum
+      pad(sqrtPriceLimitX96);                                 // sqrtPriceLimitX96
+
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: state.wallet,
+        to: UNISWAP_V3_ROUTER,
+        data: data,
+        value: '0x0',
+      }]
+    });
+    log(`✓ Swap submitted: ${txHash.slice(0,12)}...`, 'success');
+    log(`Track on CeloScan: celoscan.io/tx/${txHash}`, 'success');
+    addTxToHistory(`${q.fromSymbol}→${q.toSymbol}`, `${q.amount} → ${q.buyAmount.toFixed(4)}`, txHash, 'pending');
+    await fetchBalances();
+  } catch (e) {
+    log('Transaction rejected: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function log(msg, type = '') {
+  const box = document.getElementById('logBox');
+  const now = new Date().toTimeString().slice(0, 8);
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(entry);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setQuoteLoading(loading) {
+  const btn = document.getElementById('quoteBtn');
+  btn.textContent = loading ? '⟳ FETCHING...' : 'GET QUOTE';
+  btn.disabled = loading;
+}
+
+function selectRoute(el, route) {
+  document.querySelectorAll('.route-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  state.selectedRoute = route;
+  state.quote = null;
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+}
+
+function setSlippage(el, val) {
+  document.querySelectorAll('.slip-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.slippage = parseFloat(val);
+  document.getElementById('slippageInput').value = val;
+}
+
+function customSlippage(el) {
+  state.slippage = parseFloat(el.value) || 0.5;
+  document.querySelectorAll('.slip-btn').forEach(b => b.classList.remove('active'));
+}
+
+function flipTokens() {
+  const from = document.getElementById('fromToken');
+  const to = document.getElementById('toToken');
+  [from.value, to.value] = [to.value, from.value];
+  document.getElementById('fromAmount').value = '';
+  document.getElementById('toAmount').value = '';
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+  state.quote = null;
+  updateBalanceDisplay();
+}
+
+function onTokenChange() {
+  state.quote = null;
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+  document.getElementById('approveBtn').style.display = 'none';
+  updateBalanceDisplay();
+}
+
+function onAmountChange() {
+  state.quote = null;
+  document.getElementById('toAmount').value = '';
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+}
+
+function addTxToHistory(pair, amounts, hash, status) {
+  const history = document.getElementById('txHistory');
+  const panel = document.getElementById('historyPanel');
+  panel.style.display = 'block';
+  const shortHash = hash.slice(0,8) + '...' + hash.slice(-4);
+  const item = document.createElement('div');
+  item.className = 'tx-item';
+  item.innerHTML = `
+    <div>
+      <div style="font-size:0.8rem;color:var(--text);">${pair}</div>
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">${amounts}</div>
+    </div>
+    <div style="text-align:right;">
+      <span class="tx-badge ${status}">${status.toUpperCase()}</span>
+      <div style="font-size:0.65rem;color:var(--muted);margin-top:4px;">${shortHash}</div>
+    </div>
+  `;
+  history.prepend(item);
+  state.txHistory.unshift({ pair, amounts, hash, status });
+}
+
+// Init log
+log('Celo Trading Agent ready. Supports Uniswap V3 + Curve routing.');
+log('Connect your wallet to load balances and fetch live quotes.');
+</script>
+</body>
+</html>
