@@ -677,7 +677,7 @@ async function getQuote() {
     const url = `${ZEROX_API}?sellToken=${fromToken.address}&buyToken=${toToken.address}&sellAmount=${sellAmount}&slippagePercentage=${state.slippage/100}&takerAddress=${state.wallet}${excludedSources}`;
 
     const res = await fetch(url, {
-      headers: { '26e6a86e-d0c4-4b21-812d-e4689c5b4405': '' } // Public access; add API key for production
+      headers: { '0x-api-key': '26e6a86e-d0c4-4b21-812d-e4689c5b4405': '' } // Public access; add API key for production
     });
 
     if (!res.ok) {
