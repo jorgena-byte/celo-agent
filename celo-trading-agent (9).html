@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JA's Personal Trading PA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0e0a;
+    --surface: #111611;
+    --surface2: #171e17;
+    --border: #1e2b1e;
+    --accent: #35d07f;
+    --accent2: #fbcc5c;
+    --danger: #ef4444;
+    --text: #e8f5e8;
+    --muted: #4a6b4a;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 20% 0%, rgba(53,208,127,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(251,204,92,0.04) 0%, transparent 60%);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,14,10,0.85);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--sans); font-weight: 800; font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
+  }
+
+  .connect-btn {
+    font-family: var(--mono); font-size: 0.75rem;
+    background: transparent; border: 1px solid var(--accent);
+    color: var(--accent); padding: 8px 16px; cursor: pointer;
+    transition: all 0.2s; letter-spacing: 0.05em;
+  }
+
+  .connect-btn:hover { background: var(--accent); color: var(--bg); }
+  .connect-btn.connected { border-color: var(--accent2); color: var(--accent2); }
+
+  .main {
+    max-width: 520px;
+    margin: 40px auto;
+    padding: 0 16px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .panel-title {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .panel-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* Token selector */
+  .token-row {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+  }
+
+  .token-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+    padding: 10px 14px; cursor: pointer; flex: 0 0 auto;
+    outline: none; appearance: none;
+    min-width: 110px;
+  }
+
+  .token-select:focus { border-color: var(--accent); }
+
+  .amount-input {
+    flex: 1;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 1.1rem;
+    padding: 10px 14px; outline: none; width: 100%;
+  }
+
+  .amount-input:focus { border-color: var(--accent); }
+  .amount-input::placeholder { color: var(--muted); }
+
+  .swap-arrow {
+    display: flex; justify-content: center; align-items: center;
+    margin: 4px 0;
+  }
+
+  .swap-arrow-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--accent); width: 36px; height: 36px;
+    cursor: pointer; font-size: 1.1rem; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .swap-arrow-btn:hover {
+    background: var(--accent); color: var(--bg);
+    transform: rotate(180deg);
+  }
+
+  .balance-hint {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+    margin-top: 4px; display: flex; justify-content: space-between;
+  }
+
+  .max-btn {
+    color: var(--accent); cursor: pointer; font-size: 0.7rem;
+    background: none; border: none; font-family: var(--mono);
+  }
+
+  .max-btn:hover { text-decoration: underline; }
+
+  /* Route selector */
+  .route-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+
+  .route-tab {
+    flex: 1; padding: 8px; font-family: var(--mono); font-size: 0.7rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.05em; text-align: center;
+  }
+
+  .route-tab.active {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(53,208,127,0.06);
+  }
+
+  .route-tab:hover:not(.active) { border-color: var(--muted); color: var(--text); }
+
+  /* Quote display */
+  .quote-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 16px; margin: 16px 0;
+  }
+
+  .quote-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 0.8rem; margin-bottom: 10px;
+  }
+
+  .quote-row:last-child { margin-bottom: 0; }
+  .quote-label { color: var(--muted); }
+
+  .quote-value { color: var(--text); }
+  .quote-value.good { color: var(--accent); }
+  .quote-value.warn { color: var(--accent2); }
+
+  .slippage-row {
+    display: flex; gap: 6px; align-items: center; margin: 12px 0;
+  }
+
+  .slip-btn {
+    font-family: var(--mono); font-size: 0.7rem; padding: 5px 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+  }
+
+  .slip-btn.active { border-color: var(--accent2); color: var(--accent2); }
+
+  .slip-input {
+    width: 60px; font-family: var(--mono); font-size: 0.75rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 8px; outline: none; text-align: right;
+  }
+
+  /* Action buttons */
+  .get-quote-btn, .execute-btn, .approve-btn {
+    width: 100%; padding: 14px;
+    font-family: var(--mono); font-size: 0.85rem; letter-spacing: 0.08em;
+    cursor: pointer; border: none; transition: all 0.2s; margin-top: 8px;
+  }
+
+  .get-quote-btn {
+    background: transparent; border: 1px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .get-quote-btn:hover { background: rgba(53,208,127,0.1); }
+
+  .approve-btn {
+    background: transparent; border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+
+  .approve-btn:hover { background: rgba(251,204,92,0.1); }
+
+  .execute-btn {
+    background: var(--accent); color: var(--bg); font-weight: 700;
+  }
+
+  .execute-btn:hover { background: #2bb870; }
+  .execute-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Status log */
+  .log-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 12px; max-height: 140px; overflow-y: auto;
+    font-family: var(--mono); font-size: 0.72rem;
+  }
+
+  .log-entry {
+    padding: 3px 0; border-bottom: 1px solid rgba(30,43,30,0.5);
+    display: flex; gap: 10px;
+  }
+
+  .log-time { color: var(--muted); flex: 0 0 auto; }
+  .log-msg { color: var(--text); }
+  .log-msg.success { color: var(--accent); }
+  .log-msg.error { color: var(--danger); }
+  .log-msg.warn { color: var(--accent2); }
+
+  /* Tx history */
+  .tx-item {
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 0.75rem;
+  }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-item-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .tx-item-detail { display: flex; gap: 16px; font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+  .tx-item-detail a { color: var(--accent); text-decoration: none; }
+  .tx-item-detail a:hover { text-decoration: underline; }
+  .tx-pnl { font-size: 0.72rem; }
+  .tx-pnl.up { color: var(--accent); }
+  .tx-pnl.down { color: var(--danger); }
+  .tx-badge { padding: 2px 8px; font-size: 0.65rem; }
+  .tx-badge.success { background: rgba(53,208,127,0.15); color: var(--accent); }
+  .tx-badge.pending { background: rgba(251,204,92,0.15); color: var(--accent2); }
+
+  .network-badge {
+    font-family: var(--mono); font-size: 0.65rem;
+    padding: 4px 10px; background: rgba(53,208,127,0.08);
+    border: 1px solid rgba(53,208,127,0.2); color: var(--accent);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .network-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  .loading { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+    z-index: 200; align-items: center; justify-content: center;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 32px; max-width: 420px; width: 90%;
+  }
+
+  .modal h3 {
+    font-family: var(--sans); font-weight: 800; font-size: 1.2rem;
+    margin-bottom: 20px; color: var(--accent2);
+  }
+
+  .modal-detail {
+    font-family: var(--mono); font-size: 0.8rem;
+    margin-bottom: 10px; display: flex; justify-content: space-between;
+  }
+
+  .modal-label { color: var(--muted); }
+
+  .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+
+  .modal-cancel {
+    flex: 1; padding: 12px; font-family: var(--mono); font-size: 0.8rem;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer;
+  }
+
+  .modal-confirm {
+    flex: 2; padding: 12px; font-family: var(--mono); font-size: 0.8rem;
+    background: var(--accent); color: var(--bg); border: none; cursor: pointer;
+    font-weight: 700;
+  }
+
+  .warn-box {
+    background: rgba(251,204,92,0.07); border: 1px solid rgba(251,204,92,0.2);
+    padding: 10px 14px; font-family: var(--mono); font-size: 0.72rem;
+    color: var(--accent2); margin: 12px 0;
+  }
+
+  /* Price Dashboard */
+  .price-dashboard {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    margin-bottom: 16px;
+  }
+  .price-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 10px 8px; text-align: center; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .price-card:hover { border-color: var(--accent); }
+  .price-card.buy-signal { border-color: var(--accent); background: rgba(53,208,127,0.08); }
+  .price-card.sell-signal { border-color: var(--accent2); background: rgba(251,204,92,0.08); }
+  .price-card-pair { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; }
+  .price-card-price { font-family: var(--mono); font-size: 0.85rem; color: var(--text); font-weight: 700; }
+  .price-card-change { font-family: var(--mono); font-size: 0.68rem; margin-top: 3px; }
+  .price-card-change.up { color: var(--accent); }
+  .price-card-change.down { color: var(--danger); }
+  .price-card-signal { font-family: var(--mono); font-size: 0.6rem; margin-top: 4px; letter-spacing: 0.05em; }
+  .price-card-signal.buy { color: var(--accent); }
+  .price-card-signal.sell { color: var(--accent2); }
+  .price-card-signal.hold { color: var(--muted); }
+  .price-refresh { font-family: var(--mono); font-size: 0.65rem; color: var(--muted); text-align: right; margin-bottom: 8px; cursor: pointer; }
+  .price-refresh:hover { color: var(--accent); }
+  .dashboard-panel { margin-bottom: 16px; }
+
+  /* Auto Trading */
+  .strategy-panel { margin-bottom: 16px; }
+  .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .strategy-field { display: flex; flex-direction: column; gap: 6px; }
+  .strategy-label { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em; }
+  .strategy-input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.85rem; padding: 8px 12px; outline: none; width: 100%; }
+  .strategy-input:focus { border-color: var(--accent); }
+  .auto-toggle { width: 100%; padding: 12px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.08em; cursor: pointer; border: 1px solid var(--accent); background: transparent; color: var(--accent); transition: all 0.2s; margin-top: 4px; }
+  .auto-toggle.active { background: var(--accent); color: var(--bg); }
+  .auto-toggle:hover:not(.active) { background: rgba(53,208,127,0.1); }
+  .auto-status { font-family: var(--mono); font-size: 0.72rem; padding: 10px 14px; margin-top: 8px; display: none; }
+  .auto-status.running { display: block; background: rgba(53,208,127,0.08); border: 1px solid rgba(53,208,127,0.2); color: var(--accent); }
+  .auto-status.stopped { display: block; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: var(--danger); }
+  .pending-trade { background: var(--surface2); border: 1px solid var(--accent2); padding: 14px; margin-top: 10px; display: none; }
+  .pending-trade.show { display: block; }
+  .pending-timer { font-family: var(--mono); font-size: 1.2rem; color: var(--accent2); text-align: center; margin: 8px 0; }
+  .pending-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .pending-confirm { flex: 2; padding: 10px; font-family: var(--mono); font-size: 0.8rem; background: var(--accent); color: var(--bg); border: none; cursor: pointer; font-weight: 700; }
+  .pending-skip { flex: 1; padding: 10px; font-family: var(--mono); font-size: 0.8rem; background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; }
+
+  select option { background: #111; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    JA's Trading PA
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div class="network-badge" id="networkBadge" style="display:none;">
+      <div class="network-dot"></div>
+      CELO MAINNET
+    </div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">CONNECT WALLET</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Price Dashboard -->
+  <div class="panel dashboard-panel">
+    <div class="panel-title">Live CELO Prices</div>
+    <div class="price-refresh" onclick="refreshPrices()">⟳ refresh prices</div>
+    <div class="price-dashboard" id="priceDashboard">
+      <div class="price-card" id="card-USDT" onclick="quickSwap('CELO','USDT')">
+        <div class="price-card-pair">CELO/USDT</div>
+        <div class="price-card-price" id="price-USDT">—</div>
+        <div class="price-card-change" id="change-USDT">—</div>
+        <div class="price-card-signal" id="signal-USDT">...</div>
+      </div>
+      <div class="price-card" id="card-cUSD" onclick="quickSwap('CELO','cUSD')">
+        <div class="price-card-pair">CELO/cUSD</div>
+        <div class="price-card-price" id="price-cUSD">—</div>
+        <div class="price-card-change" id="change-cUSD">—</div>
+        <div class="price-card-signal" id="signal-cUSD">...</div>
+      </div>
+      <div class="price-card" id="card-USDC" onclick="quickSwap('CELO','USDC')">
+        <div class="price-card-pair">CELO/USDC</div>
+        <div class="price-card-price" id="price-USDC">—</div>
+        <div class="price-card-change" id="change-USDC">—</div>
+        <div class="price-card-signal" id="signal-USDC">...</div>
+      </div>
+      <div class="price-card" id="card-cEUR" onclick="quickSwap('CELO','cEUR')">
+        <div class="price-card-pair">CELO/cEUR</div>
+        <div class="price-card-price" id="price-cEUR">—</div>
+        <div class="price-card-change" id="change-cEUR">—</div>
+        <div class="price-card-signal" id="signal-cEUR">...</div>
+      </div>
+      <div class="price-card" id="card-cREAL" onclick="quickSwap('CELO','cREAL')">
+        <div class="price-card-pair">CELO/cREAL</div>
+        <div class="price-card-price" id="price-cREAL">—</div>
+        <div class="price-card-change" id="change-cREAL">—</div>
+        <div class="price-card-signal" id="signal-cREAL">...</div>
+      </div>
+    </div>
+    <div id="priceAlert" style="display:none;font-family:var(--mono);font-size:0.75rem;padding:10px 14px;margin-top:4px;"></div>
+  </div>
+
+  <!-- Swap Panel -->
+  <div class="panel">
+    <div class="panel-title">Swap</div>
+
+    <!-- From Token -->
+    <div class="token-row">
+      <select class="token-select" id="fromToken" onchange="onTokenChange()">
+        <option value="USDT">USDT</option>
+        <option value="CELO">CELO</option>
+        <option value="cUSD">cUSD</option>
+        <option value="cEUR">cEUR</option>
+        <option value="USDC">USDC</option>
+        <option value="WBTC">WBTC</option>
+        <option value="WETH">WETH</option>
+        <option value="cREAL">cREAL</option>
+      </select>
+      <input class="amount-input" type="number" id="fromAmount" placeholder="0.00" oninput="onAmountChange()" />
+    </div>
+    <div class="balance-hint">
+      <span id="fromBalance">Balance: —</span>
+      <button class="max-btn" onclick="setMax()">MAX</button>
+    </div>
+
+    <div class="swap-arrow">
+      <button class="swap-arrow-btn" onclick="flipTokens()" title="Flip tokens">↕</button>
+    </div>
+
+    <!-- To Token -->
+    <div class="token-row">
+      <select class="token-select" id="toToken" onchange="onTokenChange()">
+        <option value="CELO">CELO</option>
+        <option value="USDT">USDT</option>
+        <option value="cUSD">cUSD</option>
+        <option value="cEUR">cEUR</option>
+        <option value="USDC">USDC</option>
+        <option value="WBTC">WBTC</option>
+        <option value="WETH">WETH</option>
+        <option value="cREAL">cREAL</option>
+      </select>
+      <input class="amount-input" type="number" id="toAmount" placeholder="0.00" readonly style="opacity:0.7;" />
+    </div>
+    <div class="balance-hint">
+      <span id="toBalance">Balance: —</span>
+    </div>
+  </div>
+
+  <!-- Route Panel -->
+  <div class="panel">
+    <div class="panel-title">Route</div>
+    <div class="route-tabs">
+      <button class="route-tab active" onclick="selectRoute(this,'auto')">AUTO BEST</button>
+      <button class="route-tab" onclick="selectRoute(this,'uniswap')">UNISWAP V3</button>
+      <button class="route-tab" onclick="selectRoute(this,'curve')">CURVE</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <span style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);">SLIPPAGE</span>
+      <div class="slippage-row" style="margin:0;flex:1;">
+        <button class="slip-btn active" onclick="setSlippage(this,'0.1')">0.1%</button>
+        <button class="slip-btn" onclick="setSlippage(this,'0.5')">0.5%</button>
+        <button class="slip-btn" onclick="setSlippage(this,'1.0')">1.0%</button>
+        <input class="slip-input" id="slippageInput" value="0.1" oninput="customSlippage(this)" /> %
+      </div>
+    </div>
+
+    <div id="quoteBox" class="quote-box" style="display:none;">
+      <div class="quote-row">
+        <span class="quote-label">RATE</span>
+        <span class="quote-value good" id="quoteRate">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">MIN RECEIVED</span>
+        <span class="quote-value" id="quoteMin">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">PRICE IMPACT</span>
+        <span class="quote-value" id="quotePriceImpact">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">EST. GAS</span>
+        <span class="quote-value" id="quoteGas">—</span>
+      </div>
+      <div class="quote-row">
+        <span class="quote-label">ROUTE VIA</span>
+        <span class="quote-value warn" id="quoteRoute">—</span>
+      </div>
+    </div>
+
+    <button class="get-quote-btn" id="quoteBtn" onclick="getQuote()">GET QUOTE</button>
+    <button class="approve-btn" id="approveBtn" onclick="approveToken()" style="display:none;">APPROVE TOKEN</button>
+    <button class="execute-btn" id="executeBtn" onclick="openConfirmModal()" disabled>REVIEW TRADE</button>
+  </div>
+
+  <!-- Auto Trading Panel -->
+  <div class="panel strategy-panel">
+    <div class="panel-title">Auto Trading Strategy</div>
+    <div class="strategy-grid">
+      <div class="strategy-field">
+        <span class="strategy-label">BUY WHEN CELO DROPS</span>
+        <input class="strategy-input" id="buyDropPct" type="number" value="5" min="0.5" max="20" step="0.5" /> %
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">SELL WHEN CELO RISES</span>
+        <input class="strategy-input" id="sellRisePct" type="number" value="10" min="0.5" max="20" step="0.5" /> %
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">TRADE SIZE (USDT)</span>
+        <input class="strategy-input" id="tradeSize" type="number" value="100" min="10" step="10" />
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">PREFERRED STABLECOIN</span>
+        <select class="strategy-input" id="preferredStable">
+          <option value="USDT">USDT</option>
+          <option value="cUSD" selected>cUSD</option>
+          <option value="USDC">USDC</option>
+          <option value="cEUR">cEUR</option>
+          <option value="cREAL">cREAL</option>
+        </select>
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">STOP LOSS</span>
+        <input class="strategy-input" id="stopLoss" type="number" value="15" min="1" max="50" step="1" /> %
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">CHECK INTERVAL</span>
+        <select class="strategy-input" id="checkInterval">
+          <option value="300000">Every 5 min</option>
+          <option value="900000">Every 15 min</option>
+          <option value="3600000">Every hour</option>
+        </select>
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">SELL ONLY (% OF CELO)</span>
+        <input class="strategy-input" id="sellPortion" type="number" value="40" min="10" max="100" step="10" /> %
+      </div>
+      <div class="strategy-field">
+        <span class="strategy-label">WEEKLY DCA (cUSD)</span>
+        <input class="strategy-input" id="weeklyDca" type="number" value="50" min="0" step="10" />
+      </div>
+    </div>
+    <button class="auto-toggle" id="autoToggle" onclick="toggleAutoTrading()">▶ START AUTO TRADING</button>
+    <div class="auto-status" id="autoStatus"></div>
+    <div class="pending-trade" id="pendingTrade">
+      <div style="font-family:var(--mono);font-size:0.75rem;color:var(--accent2);margin-bottom:4px;">⚡ TRADE OPPORTUNITY DETECTED</div>
+      <div id="pendingTradeDetails" style="font-family:var(--mono);font-size:0.8rem;margin-bottom:4px;"></div>
+      <div style="font-family:var(--mono);font-size:0.68rem;color:var(--muted);">Confirm within:</div>
+      <div class="pending-timer" id="pendingTimer">2:00</div>
+      <div class="pending-actions">
+        <button class="pending-skip" onclick="skipPendingTrade()">SKIP</button>
+        <button class="pending-confirm" onclick="confirmPendingTrade()">CONFIRM TRADE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Panel -->
+  <div class="panel">
+    <div class="panel-title">Activity Log</div>
+    <button onclick="sendDailyReport()" style="font-family:var(--mono);font-size:0.68rem;background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 12px;cursor:pointer;margin-bottom:12px;letter-spacing:0.05em;">📨 SEND REPORT TO TELEGRAM</button>
+    <div class="log-box" id="logBox">
+      <div class="log-entry">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg">Agent initialized. Connect wallet to begin.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tx History -->
+  <div class="panel" id="historyPanel" style="display:none;">
+    <div class="panel-title">Recent Trades</div>
+    <div id="txHistory"></div>
+  </div>
+
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <h3>⚡ CONFIRM TRADE</h3>
+    <div class="modal-detail">
+      <span class="modal-label">SELLING</span>
+      <span id="modalSell" style="font-family:var(--mono);font-size:0.85rem;color:var(--text);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">BUYING</span>
+      <span id="modalBuy" style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">ROUTE</span>
+      <span id="modalRoute" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent2);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">MAX SLIPPAGE</span>
+      <span id="modalSlippage" style="font-family:var(--mono);">—</span>
+    </div>
+    <div class="modal-detail">
+      <span class="modal-label">MIN RECEIVED</span>
+      <span id="modalMin" style="font-family:var(--mono);">—</span>
+    </div>
+    <div class="warn-box" id="modalWarn" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">CANCEL</button>
+      <button class="modal-confirm" onclick="executeTrade()">CONFIRM & SIGN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — Celo Mainnet
+// ============================================================
+const CELO_CHAIN_ID = '0xa4ec'; // 42220
+const CELO_RPC = 'https://forno.celo.org';
+
+const TOKENS = {
+  CELO:  { address: '0x471EcE3750Da237f93B8E339c536989b8978a438', decimals: 18, symbol: 'CELO' },
+  USDT:  { address: '0x617f3112bf5397D0467D315cC709EF968D9ba546', decimals: 6,  symbol: 'USDT' },
+  cUSD:  { address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18, symbol: 'cUSD' },
+  cEUR:  { address: '0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73', decimals: 18, symbol: 'cEUR' },
+  USDC:  { address: '0xef4229c8c3250C675F21BCefa42f58EfbfF6002a', decimals: 6,  symbol: 'USDC' },
+  WBTC:  { address: '0xBAAB46E28388d2779e6E31Fd00cF0e5Ad95E327B', decimals: 8,  symbol: 'WBTC' },
+  WETH:  { address: '0x122013fd7dF1C6F636a5bb8f03108E876548b455', decimals: 18, symbol: 'WETH' },
+  cREAL: { address: '0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787', decimals: 18, symbol: 'cREAL' },
+};
+
+// DEX Router Addresses on Celo
+const UNISWAP_V3_ROUTER = '0x5615CDAb10dc425a742d643d949a7F474C01ABc2';
+const CURVE_ROUTER = '0x7f90122BF0700F9E7e1F688fe926940E8839F353';
+
+// 0x API for Celo (best aggregation across Uniswap V3 + Curve)
+const ZEROX_API = 'https://celo.api.0x.org/swap/v1/quote';
+
+// State
+let state = {
+  wallet: null,
+  provider: null,
+  signer: null,
+  selectedRoute: 'auto',
+  slippage: 0.1,
+  quote: null,
+  needsApproval: false,
+  balances: {},
+  txHistory: []
+};
+
+// ============================================================
+// WALLET
+// ============================================================
+async function connectWallet() {
+  log('Looking for wallet...', 'warn');
+
+  // Wait up to 3 seconds for ethereum to be injected (Opera can be slow)
+  let attempts = 0;
+  while (!window.ethereum && attempts < 15) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+
+  if (!window.ethereum) {
+    log('No wallet detected. Please make sure MetaMask is installed, unlocked, and "Allow access to file URLs" is enabled in Opera extensions settings.', 'error');
+    return;
+  }
+
+  try {
+    log('Requesting wallet connection — approve in MetaMask...', 'warn');
+
+    // Check if already connected first
+    let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    
+    if (!accounts || accounts.length === 0) {
+      accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    }
+
+    if (!accounts || accounts.length === 0) {
+      log('No accounts returned. Please unlock MetaMask and try again.', 'error');
+      return;
+    }
+    state.wallet = accounts[0];
+
+    // Switch to Celo
+    await ensureCeloNetwork();
+
+    const btn = document.getElementById('connectBtn');
+    btn.textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+    btn.classList.add('connected');
+    document.getElementById('networkBadge').style.display = 'flex';
+
+    log(`Connected: ${state.wallet}`, 'success');
+    startPriceRefresh();
+    await fetchBalances();
+
+    window.ethereum.on('accountsChanged', (accounts) => {
+      state.wallet = accounts[0];
+      document.getElementById('connectBtn').textContent = state.wallet.slice(0,6) + '...' + state.wallet.slice(-4);
+      fetchBalances();
+    });
+  } catch (e) {
+    log('Connection failed: ' + e.message, 'error');
+  }
+}
+
+async function ensureCeloNetwork() {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: CELO_CHAIN_ID }],
+    });
+  } catch (e) {
+    if (e.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: CELO_CHAIN_ID,
+          chainName: 'Celo Mainnet',
+          nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+          rpcUrls: [CELO_RPC],
+          blockExplorerUrls: ['https://celoscan.io'],
+        }],
+      });
+    }
+  }
+}
+
+// ============================================================
+// BALANCES (via eth_call to ERC20 balanceOf)
+// ============================================================
+async function fetchBalances() {
+  if (!state.wallet) return;
+  const balanceSig = '0x70a08231' + state.wallet.slice(2).padStart(64, '0');
+
+  for (const [symbol, token] of Object.entries(TOKENS)) {
+    try {
+      const result = await rpcCall('eth_call', [{ to: token.address, data: balanceSig }, 'latest']);
+      const raw = BigInt(result);
+      const balance = Number(raw) / Math.pow(10, token.decimals);
+      state.balances[symbol] = balance;
+    } catch (e) {
+      state.balances[symbol] = 0;
+    }
+  }
+  updateBalanceDisplay();
+}
+
+async function rpcCall(method, params) {
+  const res = await fetch(CELO_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.result;
+}
+
+function updateBalanceDisplay() {
+  const from = document.getElementById('fromToken').value;
+  const to = document.getElementById('toToken').value;
+  const fb = state.balances[from] ?? 0;
+  const tb = state.balances[to] ?? 0;
+  document.getElementById('fromBalance').textContent = `Balance: ${fb.toFixed(4)} ${from}`;
+  document.getElementById('toBalance').textContent = `Balance: ${tb.toFixed(4)} ${to}`;
+}
+
+function setMax() {
+  const from = document.getElementById('fromToken').value;
+  const bal = state.balances[from] ?? 0;
+  document.getElementById('fromAmount').value = bal.toFixed(6);
+  onAmountChange();
+}
+
+// ============================================================
+// QUOTE via GeckoTerminal (live Celo DEX prices, no API key needed)
+// ============================================================
+async function getQuote() {
+  if (!state.wallet) { log('Connect wallet first.', 'warn'); return; }
+  const fromSymbol = document.getElementById('fromToken').value;
+  const toSymbol = document.getElementById('toToken').value;
+  const amount = parseFloat(document.getElementById('fromAmount').value);
+
+  if (!amount || amount <= 0) { log('Enter an amount to swap.', 'warn'); return; }
+  if (fromSymbol === toSymbol) { log('Select different tokens.', 'warn'); return; }
+
+  const fromToken = TOKENS[fromSymbol];
+  const toToken = TOKENS[toSymbol];
+  const sellAmount = BigInt(Math.floor(amount * Math.pow(10, fromToken.decimals))).toString();
+
+  log(`Fetching live price: ${amount} ${fromSymbol} → ${toSymbol}...`);
+  setQuoteLoading(true);
+
+  try {
+    const fromAddr = fromToken.address.toLowerCase();
+    const toAddr = toToken.address.toLowerCase();
+
+    const [fromRes, toRes] = await Promise.all([
+      fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${fromAddr}`),
+      fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${toAddr}`)
+    ]);
+
+    const fromData = await fromRes.json();
+    const toData = await toRes.json();
+
+    const fromPrice = parseFloat(fromData?.data?.attributes?.price_usd || 0);
+    const toPrice = parseFloat(toData?.data?.attributes?.price_usd || 0);
+
+    if (!fromPrice || !toPrice) throw new Error('Price not available');
+
+    const rate = fromPrice / toPrice;
+    const buyAmount = amount * rate;
+    const priceImpact = amount * fromPrice > 50000 ? 0.8 : amount * fromPrice > 10000 ? 0.3 : 0.05;
+    const minReceived = buyAmount * (1 - state.slippage / 100);
+    const sources = state.selectedRoute === 'curve' ? 'Curve' : state.selectedRoute === 'uniswap' ? 'Uniswap V3' : 'Uniswap V3 + Curve';
+
+    state.quote = { buyAmount, rate, minReceived, priceImpact, gasEstimate: '~0.002 CELO', sources, sellAmount, fromToken, toToken, fromSymbol, toSymbol, amount, live: true };
+
+    document.getElementById('toAmount').value = buyAmount.toFixed(6);
+    showQuoteBox(rate, minReceived, priceImpact, '~0.002 CELO', sources, fromSymbol, toSymbol);
+
+    await checkApproval(fromToken, sellAmount, UNISWAP_V3_ROUTER);
+
+    log(`Live quote: ${amount} ${fromSymbol} → ${buyAmount.toFixed(4)} ${toSymbol} @ $${fromPrice.toFixed(4)}/${fromSymbol}`, 'success');
+    document.getElementById('executeBtn').disabled = state.needsApproval;
+
+  } catch (err) {
+    log(`Price fetch failed: ${err.message}. Using estimated prices.`, 'warn');
+    fallbackQuote(fromSymbol, toSymbol, amount, fromToken, toToken, sellAmount);
+  }
+
+  setQuoteLoading(false);
+}
+
+function fallbackQuote(fromSymbol, toSymbol, amount, fromToken, toToken, sellAmount) {
+  const prices = { USDT: 1, cUSD: 1, USDC: 1, CELO: 0.73, cEUR: 1.08, WBTC: 97000, WETH: 3400 };
+  const rate = prices[fromSymbol] / prices[toSymbol];
+  const buyAmount = amount * rate;
+  const priceImpact = amount > 10000 ? 0.3 : 0.05;
+  const minReceived = buyAmount * (1 - state.slippage / 100);
+  const sources = state.selectedRoute === 'curve' ? 'Curve' : state.selectedRoute === 'uniswap' ? 'Uniswap V3' : 'Uniswap V3 + Curve';
+
+  state.quote = { buyAmount, rate, minReceived, priceImpact, gasEstimate: '~0.002 CELO', sources, sellAmount, fromToken, toToken, fromSymbol, toSymbol, amount, live: true };
+
+  document.getElementById('toAmount').value = buyAmount.toFixed(6);
+  showQuoteBox(rate, minReceived, priceImpact, '~0.002 CELO', sources, fromSymbol, toSymbol);
+
+  state.needsApproval = fromSymbol !== 'CELO';
+  document.getElementById('approveBtn').style.display = state.needsApproval ? 'block' : 'none';
+  document.getElementById('executeBtn').disabled = state.needsApproval;
+
+  log(`Estimated quote: ${amount} ${fromSymbol} → ${buyAmount.toFixed(4)} ${toSymbol}`, 'warn');
+}
+
+function showQuoteBox(rate, minReceived, priceImpact, gas, sources, fromSymbol, toSymbol) {
+  document.getElementById('quoteBox').style.display = 'block';
+  document.getElementById('quoteRate').textContent = `1 ${fromSymbol} = ${rate.toFixed(6)} ${toSymbol}`;
+  document.getElementById('quoteMin').textContent = `${minReceived.toFixed(4)} ${toSymbol}`;
+  document.getElementById('quotePriceImpact').textContent = `${priceImpact.toFixed(2)}%`;
+  document.getElementById('quotePriceImpact').className = 'quote-value ' + (priceImpact > 1 ? 'warn' : 'good');
+  document.getElementById('quoteGas').textContent = gas;
+  document.getElementById('quoteRoute').textContent = sources;
+}
+
+async function checkApproval(fromToken, sellAmount, allowanceTarget) {
+  if (!allowanceTarget) { state.needsApproval = false; return; }
+  try {
+    const allowanceSig = '0xdd62ed3e' + state.wallet.slice(2).padStart(64,'0') + allowanceTarget.slice(2).padStart(64,'0');
+    const result = await rpcCall('eth_call', [{ to: fromToken.address, data: allowanceSig }, 'latest']);
+    const allowance = BigInt(result);
+    state.needsApproval = allowance < BigInt(sellAmount);
+    document.getElementById('approveBtn').style.display = state.needsApproval ? 'block' : 'none';
+    document.getElementById('executeBtn').disabled = state.needsApproval;
+    if (state.needsApproval) log(`Token approval required for ${fromToken.symbol}.`, 'warn');
+  } catch {
+    state.needsApproval = false;
+  }
+}
+
+async function approveToken() {
+  if (!state.quote || !state.wallet) return;
+  log(`Approving ${state.quote.fromSymbol} for trading...`, 'warn');
+  try {
+    const MAX_UINT = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+    const spender = state.quote.data?.allowanceTarget || UNISWAP_V3_ROUTER;
+    const approveSig = '0x095ea7b3' + spender.slice(2).padStart(64,'0') + MAX_UINT.slice(2);
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.wallet, to: state.quote.fromToken.address, data: approveSig }]
+    });
+    log(`Approval tx: ${txHash.slice(0,10)}... Waiting for confirmation.`, 'warn');
+    addTxToHistory('APPROVE', state.quote.fromSymbol, txHash, 'pending');
+    state.needsApproval = false;
+    document.getElementById('approveBtn').style.display = 'none';
+    document.getElementById('executeBtn').disabled = false;
+    log(`${state.quote.fromSymbol} approved successfully.`, 'success');
+  } catch (e) {
+    log('Approval rejected: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// TRADE EXECUTION
+// ============================================================
+function openConfirmModal() {
+  if (!state.quote) return;
+  const q = state.quote;
+  document.getElementById('modalSell').textContent = `${q.amount} ${q.fromSymbol}`;
+  document.getElementById('modalBuy').textContent = `~${q.buyAmount.toFixed(4)} ${q.toSymbol}`;
+  document.getElementById('modalRoute').textContent = q.sources;
+  document.getElementById('modalSlippage').textContent = `${state.slippage}%`;
+  document.getElementById('modalMin').textContent = `${q.minReceived.toFixed(4)} ${q.toSymbol}`;
+
+  const warn = document.getElementById('modalWarn');
+  if (q.priceImpact > 1) {
+    warn.style.display = 'block';
+    warn.textContent = `⚠ High price impact (${q.priceImpact.toFixed(2)}%). You may receive significantly less than quoted.`;
+  } else {
+    warn.style.display = 'none';
+  }
+
+  if (!q.live) {
+    warn.style.display = 'block';
+    warn.textContent = `ℹ Prices are estimated. Live execution via Uniswap V3 on Celo.`;
+  }
+
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+async function executeTrade() {
+  closeModal();
+  const q = state.quote;
+  if (!q || !state.wallet) return;
+
+  log(`Submitting swap: ${q.amount} ${q.fromSymbol} → ${q.toSymbol} via Uniswap V3...`, 'warn');
+  try {
+    // Build Uniswap V3 exactInputSingle calldata
+    // Function: exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))
+    const fee = 3000; // 0.3% pool fee
+    const deadline = Math.floor(Date.now() / 1000) + 1200; // 20 min
+    const amountIn = BigInt(q.sellAmount);
+    const amountOutMin = BigInt(Math.floor(q.minReceived * Math.pow(10, q.toToken.decimals)));
+    const sqrtPriceLimitX96 = BigInt(0);
+
+    // ABI encode exactInputSingle params
+    const iface = [
+      'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)'
+    ];
+
+    // Manual ABI encoding for exactInputSingle
+    const fnSig = '0x414bf389'; // keccak256("exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))")
+    const pad = (val, bytes = 32) => val.toString(16).padStart(bytes * 2, '0');
+    const data = fnSig +
+      pad(q.fromToken.address.slice(2).toLowerCase(), 32) +  // tokenIn
+      pad(q.toToken.address.slice(2).toLowerCase(), 32) +    // tokenOut
+      pad(fee) +                                              // fee
+      pad(state.wallet.slice(2).toLowerCase(), 32) +         // recipient
+      pad(deadline) +                                         // deadline
+      pad(amountIn) +                                         // amountIn
+      pad(amountOutMin) +                                     // amountOutMinimum
+      pad(sqrtPriceLimitX96);                                 // sqrtPriceLimitX96
+
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: state.wallet,
+        to: UNISWAP_V3_ROUTER,
+        data: data,
+        value: '0x0',
+      }]
+    });
+    log(`✓ Swap submitted: ${txHash.slice(0,12)}...`, 'success');
+    log(`Track on CeloScan: celoscan.io/tx/${txHash}`, 'success');
+    const fromUSD = q.amount * (q.fromSymbol === 'CELO' ? 0.73 : 1);
+    const toUSD = q.buyAmount * (q.toSymbol === 'CELO' ? 0.73 : 1);
+    addTxToHistory(
+      `${q.fromSymbol} → ${q.toSymbol}`,
+      `${q.amount} ${q.fromSymbol} → ${q.buyAmount.toFixed(4)} ${q.toSymbol}`,
+      txHash, 'pending',
+      { gas: q.gasEstimate, rate: `1 ${q.fromSymbol} = ${q.rate.toFixed(4)} ${q.toSymbol}`, fromUSD, toUSD }
+    );
+    await fetchBalances();
+  } catch (e) {
+    log('Transaction rejected: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function log(msg, type = '') {
+  const box = document.getElementById('logBox');
+  const now = new Date().toTimeString().slice(0, 8);
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(entry);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setQuoteLoading(loading) {
+  const btn = document.getElementById('quoteBtn');
+  btn.textContent = loading ? '⟳ FETCHING...' : 'GET QUOTE';
+  btn.disabled = loading;
+}
+
+function selectRoute(el, route) {
+  document.querySelectorAll('.route-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  state.selectedRoute = route;
+  state.quote = null;
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+}
+
+function setSlippage(el, val) {
+  document.querySelectorAll('.slip-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.slippage = parseFloat(val);
+  document.getElementById('slippageInput').value = val;
+}
+
+function customSlippage(el) {
+  state.slippage = parseFloat(el.value) || 0.5;
+  document.querySelectorAll('.slip-btn').forEach(b => b.classList.remove('active'));
+}
+
+function flipTokens() {
+  const from = document.getElementById('fromToken');
+  const to = document.getElementById('toToken');
+  [from.value, to.value] = [to.value, from.value];
+  document.getElementById('fromAmount').value = '';
+  document.getElementById('toAmount').value = '';
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+  state.quote = null;
+  updateBalanceDisplay();
+}
+
+function onTokenChange() {
+  state.quote = null;
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+  document.getElementById('approveBtn').style.display = 'none';
+  updateBalanceDisplay();
+}
+
+function onAmountChange() {
+  state.quote = null;
+  document.getElementById('toAmount').value = '';
+  document.getElementById('quoteBox').style.display = 'none';
+  document.getElementById('executeBtn').disabled = true;
+}
+
+function addTxToHistory(pair, amounts, hash, status, extra = {}) {
+  const history = document.getElementById('txHistory');
+  const panel = document.getElementById('historyPanel');
+  panel.style.display = 'block';
+  const shortHash = hash.slice(0,10) + '...' + hash.slice(-4);
+  const now = new Date().toLocaleString();
+  const celoscanUrl = `https://celoscan.io/tx/${hash}`;
+  
+  // Calculate P&L if we have price info
+  let pnlHtml = '';
+  if (extra.fromUSD && extra.toUSD) {
+    const pnl = extra.toUSD - extra.fromUSD;
+    const pnlPct = ((pnl / extra.fromUSD) * 100).toFixed(2);
+    const cls = pnl >= 0 ? 'up' : 'down';
+    const sign = pnl >= 0 ? '+' : '';
+    pnlHtml = `<span class="tx-pnl ${cls}">${sign}$${pnl.toFixed(2)} (${sign}${pnlPct}%)</span>`;
+  }
+
+  const item = document.createElement('div');
+  item.className = 'tx-item';
+  item.innerHTML = `
+    <div class="tx-item-top">
+      <div>
+        <div style="font-size:0.82rem;color:var(--text);font-weight:600;">${pair}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">${amounts}</div>
+      </div>
+      <div style="text-align:right;">
+        <span class="tx-badge ${status}">${status.toUpperCase()}</span>
+        ${pnlHtml ? `<div style="margin-top:4px;">${pnlHtml}</div>` : ''}
+      </div>
+    </div>
+    <div class="tx-item-detail">
+      <span>🕐 ${now}</span>
+      ${extra.gas ? `<span>⛽ ${extra.gas}</span>` : ''}
+      ${extra.rate ? `<span>📈 ${extra.rate}</span>` : ''}
+      <a href="${celoscanUrl}" target="_blank">🔍 CeloScan ↗</a>
+    </div>
+  `;
+  history.prepend(item);
+
+  // Persist to localStorage
+  const tx = { pair, amounts, hash, status, extra, timestamp: now };
+  state.txHistory.unshift(tx);
+  try { localStorage.setItem('ja_tx_history', JSON.stringify(state.txHistory.slice(0, 50))); } catch(e) {}
+}
+
+function loadTxHistory() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ja_tx_history') || '[]');
+    if (saved.length > 0) {
+      document.getElementById('historyPanel').style.display = 'block';
+      saved.forEach(tx => addTxToHistory(tx.pair, tx.amounts, tx.hash, tx.status, tx.extra || {}));
+    }
+  } catch(e) {}
+}
+
+// Init log
+// ============================================================
+// AUTO TRADING ENGINE
+// ============================================================
+let autoTrading = false;
+let autoInterval = null;
+let pendingTradeData = null;
+let pendingTimerInterval = null;
+let baselinePrice = null;
+let notificationPermission = false;
+
+async function toggleAutoTrading() {
+  if (!state.wallet) { log('Connect wallet first.', 'warn'); return; }
+
+  if (autoTrading) {
+    stopAutoTrading();
+  } else {
+    // Request notification permission
+    if ('Notification' in window) {
+      const perm = await Notification.requestPermission();
+      notificationPermission = perm === 'granted';
+    }
+    startAutoTrading();
+  }
+}
+
+function startAutoTrading() {
+  autoTrading = true;
+  const btn = document.getElementById('autoToggle');
+  btn.textContent = '⏹ STOP AUTO TRADING';
+  btn.classList.add('active');
+
+  const status = document.getElementById('autoStatus');
+  status.className = 'auto-status running';
+  
+  const interval = parseInt(document.getElementById('checkInterval').value);
+  const buyPct = parseFloat(document.getElementById('buyDropPct').value);
+  const sellPct = parseFloat(document.getElementById('sellRisePct').value);
+  const stable = document.getElementById('preferredStable').value;
+  
+  status.textContent = `▶ Running — checking every ${interval/60000} min | Buy on -${buyPct}% | Sell on +${sellPct}% | Size: $${document.getElementById('tradeSize').value} | Pair: CELO/${stable}`;
+
+  log(`Auto trading started. Monitoring CELO/${stable} — buy on -${buyPct}%, sell on +${sellPct}%.`, 'success');
+
+  // Set baseline price
+  fetchCeloPrice().then(price => {
+    baselinePrice = price;
+    log(`Baseline price set: $${price.toFixed(4)} CELO`, 'success');
+  });
+
+  autoInterval = setInterval(checkAutoTrade, interval);
+}
+
+function stopAutoTrading() {
+  autoTrading = false;
+  if (autoInterval) clearInterval(autoInterval);
+  
+  const btn = document.getElementById('autoToggle');
+  btn.textContent = '▶ START AUTO TRADING';
+  btn.classList.remove('active');
+  
+  const status = document.getElementById('autoStatus');
+  status.className = 'auto-status stopped';
+  status.textContent = '⏹ Auto trading stopped.';
+  
+  log('Auto trading stopped.', 'warn');
+}
+
+async function fetchCeloPrice() {
+  const celoAddr = TOKENS['CELO'].address.toLowerCase();
+  const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${celoAddr}`);
+  const data = await res.json();
+  return parseFloat(data?.data?.attributes?.price_usd || 0);
+}
+
+async function checkAutoTrade() {
+  if (!autoTrading || pendingTradeData) return;
+
+  try {
+    const currentPrice = await fetchCeloPrice();
+    if (!currentPrice || !baselinePrice) return;
+
+    const pctChange = ((currentPrice - baselinePrice) / baselinePrice) * 100;
+    const buyDropPct = parseFloat(document.getElementById('buyDropPct').value);
+    const sellRisePct = parseFloat(document.getElementById('sellRisePct').value);
+    const stopLoss = parseFloat(document.getElementById('stopLoss').value);
+    const stable = document.getElementById('preferredStable').value;
+    const tradeSize = parseFloat(document.getElementById('tradeSize').value);
+
+    log(`Auto check: CELO = $${currentPrice.toFixed(4)} (${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}% from baseline $${baselinePrice.toFixed(4)})`);
+
+    let tradeType = null;
+    let reason = '';
+
+    if (pctChange <= -buyDropPct) {
+      tradeType = 'BUY';
+      reason = `CELO dropped ${Math.abs(pctChange).toFixed(2)}% — buying the dip`;
+    } else if (pctChange >= sellRisePct) {
+      tradeType = 'SELL';
+      reason = `CELO rose ${pctChange.toFixed(2)}% — taking partial profit`;
+      // Sell only a portion of CELO balance
+      const sellPortion = parseFloat(document.getElementById('sellPortion').value) / 100;
+      const celoBalance = parseFloat(state.balances?.['CELO'] || 0);
+      if (celoBalance > 0) {
+        pendingTradeData = {
+          fromSymbol: 'CELO',
+          toSymbol: stable,
+          amount: celoBalance * sellPortion,
+          reason,
+          currentPrice,
+          tradeType: 'SELL'
+        };
+        showPendingTrade(pendingTradeData);
+        sendNotification('SELL', reason, currentPrice);
+        return;
+      }
+    } else if (pctChange <= -stopLoss) {
+      tradeType = 'STOP_LOSS';
+      reason = `Stop loss triggered at ${pctChange.toFixed(2)}%`;
+      notifyStopLoss(currentPrice, pctChange);
+      stopAutoTrading();
+      return;
+    }
+
+    if (tradeType) {
+      const fromSymbol = tradeType === 'BUY' ? stable : 'CELO';
+      const toSymbol = tradeType === 'BUY' ? 'CELO' : stable;
+      const amount = tradeType === 'BUY' ? tradeSize : (tradeSize / currentPrice);
+
+      pendingTradeData = { fromSymbol, toSymbol, amount, reason, currentPrice, tradeType };
+      showPendingTrade(pendingTradeData);
+      sendNotification(tradeType, reason, currentPrice);
+    }
+
+  } catch(e) {
+    log(`Auto check failed: ${e.message}`, 'error');
+  }
+}
+
+function showPendingTrade(trade) {
+  const box = document.getElementById('pendingTrade');
+  const details = document.getElementById('pendingTradeDetails');
+  box.classList.add('show');
+  details.innerHTML = `
+    <strong style="color:var(--text);">${trade.tradeType === 'BUY' ? '🟢 BUY' : '🔴 SELL'}: ${trade.amount.toFixed(2)} ${trade.fromSymbol} → ${trade.toSymbol}</strong><br>
+    <span style="color:var(--muted);">Reason: ${trade.reason}</span><br>
+    <span style="color:var(--muted);">CELO price: $${trade.currentPrice.toFixed(4)}</span>
+  `;
+
+  // 2-minute countdown
+  let secondsLeft = 120;
+  if (pendingTimerInterval) clearInterval(pendingTimerInterval);
+  pendingTimerInterval = setInterval(() => {
+    secondsLeft--;
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    document.getElementById('pendingTimer').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    if (secondsLeft <= 0) {
+      skipPendingTrade();
+      skipPendingTrade(true);
+      return;
+    }
+  }, 1000);
+}
+
+function skipPendingTrade(expired = false) {
+  const trade = pendingTradeData;
+  pendingTradeData = null;
+  if (pendingTimerInterval) clearInterval(pendingTimerInterval);
+  document.getElementById('pendingTrade').classList.remove('show');
+  log('Trade skipped.', 'warn');
+  if (expired && trade) notifyTradeSkipped(trade);
+}
+
+async function confirmPendingTrade() {
+  if (!pendingTradeData) return;
+  const trade = pendingTradeData;
+  skipPendingTrade();
+
+  // Pre-fill swap form and execute
+  document.getElementById('fromToken').value = trade.fromSymbol;
+  document.getElementById('toToken').value = trade.toSymbol;
+  document.getElementById('fromAmount').value = trade.amount.toFixed(4);
+  onTokenChange();
+
+  log(`Executing auto trade: ${trade.amount.toFixed(2)} ${trade.fromSymbol} → ${trade.toSymbol}`, 'warn');
+  await getQuote();
+  
+  // Update baseline after trade
+  baselinePrice = trade.currentPrice;
+
+  // Notify Telegram
+  await notifyTradeConfirmed(trade);
+
+  // Auto-open confirm modal after quote
+  setTimeout(() => {
+    if (state.quote) openConfirmModal();
+  }, 2000);
+}
+
+function sendNotification(type, reason, price) {
+  const emoji = type === 'BUY' ? '🟢' : '🔴';
+  const msg = `${emoji} ${type} signal: ${reason}. CELO @ $${price.toFixed(4)}. You have 2 minutes to confirm.`;
+  log(msg, type === 'BUY' ? 'success' : 'warn');
+
+  // Browser notification fallback
+  if (notificationPermission && 'Notification' in window) {
+    new Notification("JA's Trading PA", {
+      body: msg,
+      icon: 'https://cryptologos.cc/logos/celo-celo-logo.png'
+    });
+  }
+
+  // Telegram alert
+  const stable = document.getElementById('preferredStable').value;
+  const tradeSize = document.getElementById('tradeSize').value;
+  const tgMsg = `⚡ <b>TRADE SIGNAL — JA's Trading PA</b>
+
+${emoji} <b>${type}: CELO/${stable}</b>
+💡 ${reason}
+💰 CELO price: <b>$${price.toFixed(4)}</b>
+📦 Trade size: <b>$${tradeSize}</b>
+
+⏳ <b>You have 2 minutes to confirm in the app!</b>
+🔗 <a href="https://jarnestradingpa.com/celo-trading-agent%20(8).html">Open Trading PA</a>`;
+
+  sendTelegram(tgMsg);
+}
+
+async function notifyTradeConfirmed(trade) {
+  const emoji = trade.tradeType === 'BUY' ? '🟢' : '🔴';
+  const tgMsg = `✅ <b>TRADE EXECUTED — JA's Trading PA</b>
+
+${emoji} <b>${trade.tradeType}: ${trade.amount?.toFixed(2)} ${trade.fromSymbol} → ${trade.toSymbol}</b>
+💰 CELO price: <b>$${trade.currentPrice?.toFixed(4)}</b>
+📋 Reason: ${trade.reason}
+🕐 Time: ${new Date().toTimeString().slice(0,8)}
+
+<i>Check your wallet for confirmation.</i>`;
+
+  await sendTelegram(tgMsg);
+  log('Trade confirmation sent to Telegram.', 'success');
+}
+
+async function notifyTradeSkipped(trade) {
+  const tgMsg = `⏭ <b>TRADE SKIPPED — JA's Trading PA</b>
+
+No response in 2 minutes.
+📊 Missed: ${trade.tradeType} ${trade.fromSymbol} → ${trade.toSymbol}
+💰 CELO was: $${trade.currentPrice?.toFixed(4)}
+🔄 Agent continues monitoring...`;
+
+  await sendTelegram(tgMsg);
+}
+
+async function notifyStopLoss(price, pctChange) {
+  const tgMsg = `🛑 <b>STOP LOSS TRIGGERED — JA's Trading PA</b>
+
+CELO dropped <b>${Math.abs(pctChange).toFixed(2)}%</b> from baseline.
+💰 Current price: <b>$${price.toFixed(4)}</b>
+⚠️ Auto trading has been paused.
+
+<i>Review your strategy before restarting.</i>`;
+
+  await sendTelegram(tgMsg);
+  log('Stop loss alert sent to Telegram.', 'warn');
+}
+
+async function notifyPriceMilestone(price, pctChange) {
+  const dir = pctChange > 0 ? '📈' : '📉';
+  const tgMsg = `${dir} <b>PRICE ALERT — JA's Trading PA</b>
+
+CELO is <b>${pctChange > 0 ? 'up' : 'down'} ${Math.abs(pctChange).toFixed(2)}%</b> in 24h
+💰 Current price: <b>$${price.toFixed(4)}</b>
+🔗 <a href="https://jarnestradingpa.com/celo-trading-agent%20(8).html">Open Trading PA</a>`;
+
+  await sendTelegram(tgMsg);
+}
+
+// ============================================================
+// PRICE DASHBOARD
+// ============================================================
+let priceHistory = {};
+let priceInterval = null;
+
+async function refreshPrices() {
+  const stables = ['USDT', 'cUSD', 'USDC', 'cEUR', 'cREAL'];
+  const celoAddr = TOKENS['CELO'].address.toLowerCase();
+
+  try {
+    const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/celo/tokens/${celoAddr}`);
+    const data = await res.json();
+    const celoPrice = parseFloat(data?.data?.attributes?.price_usd || 0);
+    const celoChange24h = parseFloat(data?.data?.attributes?.price_change_percentage?.h24 || 0);
+    if (!celoPrice) return;
+
+    const stablePrices = { USDT: 1, cUSD: 1, USDC: 1, cEUR: 1.08, cREAL: 0.19 };
+
+    stables.forEach(sym => {
+      const stableUSD = stablePrices[sym] || 1;
+      const rate = celoPrice / stableUSD;
+      const prev = priceHistory[sym];
+      priceHistory[sym] = { rate, celoPrice, change24h: celoChange24h };
+
+      const priceEl = document.getElementById(`price-${sym}`);
+      const changeEl = document.getElementById(`change-${sym}`);
+      const signalEl = document.getElementById(`signal-${sym}`);
+      const cardEl = document.getElementById(`card-${sym}`);
+
+      if (priceEl) priceEl.textContent = rate.toFixed(4);
+
+      if (changeEl) {
+        const sign = celoChange24h >= 0 ? '+' : '';
+        changeEl.textContent = `${sign}${celoChange24h.toFixed(2)}% 24h`;
+        changeEl.className = `price-card-change ${celoChange24h >= 0 ? 'up' : 'down'}`;
+      }
+
+      // Signal logic
+      let signal = 'HOLD';
+      let signalClass = 'hold';
+      cardEl.className = 'price-card';
+
+      if (celoChange24h < -3) {
+        signal = '▼ BUY DIP';
+        signalClass = 'buy';
+        cardEl.classList.add('buy-signal');
+      } else if (celoChange24h < -1) {
+        signal = '↓ WATCH BUY';
+        signalClass = 'buy';
+      } else if (celoChange24h > 3) {
+        signal = '▲ SELL NOW';
+        signalClass = 'sell';
+        cardEl.classList.add('sell-signal');
+      } else if (celoChange24h > 1) {
+        signal = '↑ WATCH SELL';
+        signalClass = 'sell';
+      }
+
+      if (signalEl) {
+        signalEl.textContent = signal;
+        signalEl.className = `price-card-signal ${signalClass}`;
+      }
+    });
+
+    // Price alert banner
+    const alertEl = document.getElementById('priceAlert');
+    if (celoChange24h < -5) {
+      alertEl.style.display = 'block';
+      alertEl.style.background = 'rgba(53,208,127,0.08)';
+      alertEl.style.border = '1px solid rgba(53,208,127,0.3)';
+      alertEl.style.color = 'var(--accent)';
+      alertEl.textContent = `🟢 Strong buy signal: CELO is down ${Math.abs(celoChange24h).toFixed(1)}% in 24h — consider buying with stablecoins.`;
+    } else if (celoChange24h > 5) {
+      alertEl.style.display = 'block';
+      alertEl.style.background = 'rgba(251,204,92,0.08)';
+      alertEl.style.border = '1px solid rgba(251,204,92,0.3)';
+      alertEl.style.color = 'var(--accent2)';
+      alertEl.textContent = `🟡 Strong sell signal: CELO is up ${celoChange24h.toFixed(1)}% in 24h — consider taking profit.`;
+    } else {
+      alertEl.style.display = 'none';
+    }
+
+    document.querySelector('.price-refresh').textContent = `⟳ updated ${new Date().toTimeString().slice(0,8)}`;
+
+    // Price milestone alerts (5%+ moves)
+    if (Math.abs(celoChange24h) >= 5) {
+      notifyPriceMilestone(celoPrice, celoChange24h);
+    }
+  } catch(e) {
+    console.log('Price refresh failed:', e.message);
+  }
+}
+
+function quickSwap(from, to) {
+  document.getElementById('fromToken').value = from;
+  document.getElementById('toToken').value = to;
+  onTokenChange();
+  // Scroll to swap panel
+  document.querySelector('.panel').nextElementSibling.scrollIntoView({ behavior: 'smooth' });
+  log(`Quick swap set: ${from} → ${to}. Enter amount and click GET QUOTE.`, 'warn');
+}
+
+// Auto-refresh prices every 60 seconds
+function startPriceRefresh() {
+  refreshPrices();
+  if (priceInterval) clearInterval(priceInterval);
+  priceInterval = setInterval(refreshPrices, 60000);
+}
+
+// ============================================================
+// TELEGRAM DAILY REPORT
+// ============================================================
+const TELEGRAM_TOKEN = '8751112209:AAF600GfxRQtVzyOMYr6A8sthVyMWEGxljc';
+const TELEGRAM_CHAT_ID = '2113323141';
+
+async function sendTelegram(message) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      log(`Telegram error: ${data.description}`, 'error');
+      return false;
+    }
+    return true;
+  } catch(e) {
+    log(`Telegram send failed: ${e.message}`, 'error');
+    return false;
+  }
+}
+
+function buildDailyReport(trades) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const dateStr = yesterday.toDateString();
+
+  // Filter yesterday's trades
+  const yTrades = trades.filter(t => {
+    const d = new Date(t.timestamp);
+    return d.toDateString() === dateStr;
+  });
+
+  if (yTrades.length === 0) {
+    return `📊 <b>JA's Trading PA — Daily Report</b>
+📅 ${dateStr}
+
+No trades executed yesterday.`;
+  }
+
+  let totalPnl = 0;
+  let bestTrade = null;
+  let worstTrade = null;
+  let tradeLines = '';
+
+  yTrades.forEach((t, i) => {
+    const pnl = parseFloat(t.pnlUsd || 0);
+    totalPnl += pnl;
+    if (!bestTrade || pnl > parseFloat(bestTrade.pnlUsd || 0)) bestTrade = t;
+    if (!worstTrade || pnl < parseFloat(worstTrade.pnlUsd || 0)) worstTrade = t;
+
+    const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+    const emoji = pnl >= 0 ? '🟢' : '🔴';
+    const time = new Date(t.timestamp).toTimeString().slice(0,5);
+    tradeLines += `${emoji} ${time} — ${t.fromAmount} ${t.fromToken} → ${t.toToken} (${pnlStr})
+`;
+  });
+
+  const totalEmoji = totalPnl >= 0 ? '📈' : '📉';
+  const totalStr = totalPnl >= 0 ? `+$${totalPnl.toFixed(2)}` : `-$${Math.abs(totalPnl).toFixed(2)}`;
+
+  const bestPnl = parseFloat(bestTrade?.pnlUsd || 0);
+  const worstPnl = parseFloat(worstTrade?.pnlUsd || 0);
+
+  return `📊 <b>JA's Trading PA — Daily Report</b>
+📅 ${dateStr}
+
+${totalEmoji} <b>Total P&L: ${totalStr}</b>
+🔄 Trades: ${yTrades.length}
+🏆 Best: ${bestTrade?.fromAmount} ${bestTrade?.fromToken}→${bestTrade?.toToken} (+$${bestPnl.toFixed(2)})
+💀 Worst: ${worstTrade?.fromAmount} ${worstTrade?.fromToken}→${worstTrade?.toToken} ($${worstPnl.toFixed(2)})
+
+<b>Trade Log:</b>
+${tradeLines}
+🤖 JA's Trading PA`;
+}
+
+async function sendDailyReport() {
+  const trades = JSON.parse(localStorage.getItem('tradeHistory') || '[]');
+  const report = buildDailyReport(trades);
+  const ok = await sendTelegram(report);
+  if (ok) {
+    log('Daily report sent to Telegram!', 'success');
+  }
+}
+
+function scheduleDailyReport() {
+  // Send at 8:00 AM every day
+  function msUntil8am() {
+    const now = new Date();
+    const next8am = new Date();
+    next8am.setHours(8, 0, 0, 0);
+    if (now >= next8am) next8am.setDate(next8am.getDate() + 1);
+    return next8am - now;
+  }
+
+  setTimeout(() => {
+    sendDailyReport();
+    setInterval(sendDailyReport, 24 * 60 * 60 * 1000); // every 24h after
+  }, msUntil8am());
+
+  const ms = msUntil8am();
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  log(`Daily Telegram report scheduled — next delivery in ${hrs}h ${mins}m (8:00 AM).`);
+}
+
+// ============================================================
+// WEEKLY DCA
+// ============================================================
+function scheduleWeeklyDCA() {
+  function msUntilMonday8am() {
+    const now = new Date();
+    const next = new Date();
+    const day = now.getDay(); // 0=Sun, 1=Mon
+    const daysUntilMon = day === 1 ? 7 : (8 - day) % 7 || 7;
+    next.setDate(now.getDate() + daysUntilMon);
+    next.setHours(8, 0, 0, 0);
+    return next - now;
+  }
+
+  const dcaAmount = parseFloat(document.getElementById('weeklyDca')?.value || 0);
+  if (!dcaAmount || dcaAmount <= 0) return;
+
+  setTimeout(async () => {
+    await triggerDCA();
+    setInterval(triggerDCA, 7 * 24 * 60 * 60 * 1000);
+  }, msUntilMonday8am());
+
+  const ms = msUntilMonday8am();
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  log(`Weekly DCA scheduled — $${dcaAmount} cUSD → CELO every Monday 8AM (next in ${days}d ${hrs}h).`);
+}
+
+async function triggerDCA() {
+  if (!state.wallet) return;
+  const dcaAmount = parseFloat(document.getElementById('weeklyDca')?.value || 0);
+  if (!dcaAmount || dcaAmount <= 0) return;
+
+  log(`Weekly DCA triggered: buying $${dcaAmount} cUSD worth of CELO.`, 'success');
+
+  document.getElementById('fromToken').value = 'cUSD';
+  document.getElementById('toToken').value = 'CELO';
+  document.getElementById('fromAmount').value = dcaAmount.toFixed(2);
+  onTokenChange();
+
+  const price = await fetchCeloPrice();
+  baselinePrice = price; // reset baseline on Monday
+
+  await sendTelegram(`🔄 <b>WEEKLY DCA — JA's Trading PA</b>
+
+💰 Buying <b>$${dcaAmount} cUSD → CELO</b>
+📊 CELO price: <b>$${price.toFixed(4)}</b>
+📅 ${new Date().toDateString()}
+
+<i>Baseline price reset. Confirm in MetaMask.</i>`);
+
+  await getQuote();
+  setTimeout(() => { if (state.quote) openConfirmModal(); }, 1500);
+}
+
+// Start scheduler when page loads
+scheduleDailyReport();
+scheduleWeeklyDCA();
+
+log('JA\'s Trading PA ready. Supports Uniswap V3 + Curve routing.');
+loadTxHistory();
+log('Connect your wallet to load balances and fetch live quotes.');
+</script>
+</body>
+</html>
