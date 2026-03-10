@@ -11,7 +11,7 @@ const CONFIG = {
   EXECUTOR_ADDRESS: '0xD896F9b50A80F20040E579A551E3CCbF326D6810',
   TELEGRAM_TOKEN: '8751112209:AAF600GfxRQtVzyOMYr6A8sthVyMWEGxljc',
   TELEGRAM_CHAT_ID: '2113323141',
-  UNISWAP_ROUTER: '0x5615CDAb10dc425a742d643d949a7F474C01ABc2',
+  UNISWAP_ROUTER: '0x5615cdab10dc425a742d643d949a7f474c01abc2',
 
   // CELO strategy
   BUY_DROP_PCT: 5,
@@ -27,12 +27,12 @@ const CONFIG = {
 };
 
 const TOKENS = {
-  CELO:  { address: '0x471EcE3750Da237f93B8E339c536989b8978a438', decimals: 18 },
-  cUSD:  { address: '0x765DE816845861e75A25fCA122bb6898B8B1282a', decimals: 18 },
-  cEUR:  { address: '0xD8763CBa276a3738E6DE85b4b3bF5FDed6D6cA73', decimals: 18 },
-  cREAL: { address: '0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787', decimals: 18 },
-  USDT:  { address: '0x617f3112bf5397D0467D315cC709EF968D9ba546', decimals: 6  },
-  USDC:  { address: '0xef4229c8c3250C675F21BCefa42f58EfbfF6002a', decimals: 6  },
+  CELO:  { address: '0x471ece3750da237f93b8e339c536989b8978a438', decimals: 18 },
+  cUSD:  { address: '0x765de816845861e75a25fca122bb6898b8b1282a', decimals: 18 },
+  cEUR:  { address: '0xd8763cba276a3738e6de85b4b3bf5fded6d6ca73', decimals: 18 },
+  cREAL: { address: '0xe8537a3d056da446677b9e9d6c5db704eaab4787', decimals: 18 },
+  USDT:  { address: '0x617f3112bf5397d0467d315cc709ef968d9ba546', decimals: 6  },
+  USDC:  { address: '0xef4229c8c3250c675f21bcefa42f58efbff6002a', decimals: 6  },
 };
 
 // ============================================================
@@ -124,28 +124,34 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
     'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) returns (uint256 amountOut)'
   ]);
 
-  const safeContract = new ethers.Contract(CONFIG.SAFE_ADDRESS, safeInterface, executorWallet);
+  // Checksum all addresses for ethers v5 compatibility
+  const toAddr     = ethers.utils.getAddress(toToken.address);
+  const fromAddr   = ethers.utils.getAddress(fromToken.address);
+  const routerAddr = ethers.utils.getAddress(CONFIG.UNISWAP_ROUTER);
+  const safeAddr   = ethers.utils.getAddress(CONFIG.SAFE_ADDRESS);
+
+  const safeContract = new ethers.Contract(safeAddr, safeInterface, executorWallet);
 
   // Approve
-  const approveData = erc20Interface.encodeFunctionData('approve', [CONFIG.UNISWAP_ROUTER, amountInUnits]);
-  const approveTx = await safeContract.execTransactionFromModule(fromToken.address, 0, approveData, 0, { gasLimit: 200000 });
+  const approveData = erc20Interface.encodeFunctionData('approve', [routerAddr, amountInUnits]);
+  const approveTx = await safeContract.execTransactionFromModule(fromAddr, 0, approveData, 0, { gasLimit: 200000 });
   await approveTx.wait();
   console.log(`Approval confirmed: ${approveTx.hash}`);
 
   // Swap
   const deadline = Math.floor(Date.now() / 1000) + 300;
   const swapData = uniswapInterface.encodeFunctionData('exactInputSingle', [{
-    tokenIn: fromToken.address,
-    tokenOut: toToken.address,
+    tokenIn: fromAddr,
+    tokenOut: toAddr,
     fee: 3000,
-    recipient: CONFIG.SAFE_ADDRESS,
+    recipient: safeAddr,
     deadline,
     amountIn: amountInUnits,
     amountOutMinimum: 0,
     sqrtPriceLimitX96: 0
   }]);
 
-  const swapTx = await safeContract.execTransactionFromModule(CONFIG.UNISWAP_ROUTER, 0, swapData, 0, { gasLimit: 500000 });
+  const swapTx = await safeContract.execTransactionFromModule(routerAddr, 0, swapData, 0, { gasLimit: 500000 });
   await swapTx.wait();
   console.log(`Swap confirmed: ${swapTx.hash}`);
 
