@@ -203,6 +203,42 @@ header {
         <div class="price-change" id="change-USDT">—</div>
         <div id="signal-USDT"></div>
       </div>
+      <div class="price-card" id="card-cGBP">
+        <div class="price-sym">CELO/cGBP</div>
+        <div class="price-val" id="price-cGBP">—</div>
+        <div class="price-change" id="change-cGBP">—</div>
+        <div id="signal-cGBP"></div>
+      </div>
+      <div class="price-card" id="card-cKES">
+        <div class="price-sym">CELO/cKES</div>
+        <div class="price-val" id="price-cKES">—</div>
+        <div class="price-change" id="change-cKES">—</div>
+        <div id="signal-cKES"></div>
+      </div>
+      <div class="price-card" id="card-cZAR">
+        <div class="price-sym">CELO/cZAR</div>
+        <div class="price-val" id="price-cZAR">—</div>
+        <div class="price-change" id="change-cZAR">—</div>
+        <div id="signal-cZAR"></div>
+      </div>
+      <div class="price-card" id="card-cNGN">
+        <div class="price-sym">CELO/cNGN</div>
+        <div class="price-val" id="price-cNGN">—</div>
+        <div class="price-change" id="change-cNGN">—</div>
+        <div id="signal-cNGN"></div>
+      </div>
+      <div class="price-card" id="card-cCOP">
+        <div class="price-sym">CELO/cCOP</div>
+        <div class="price-val" id="price-cCOP">—</div>
+        <div class="price-change" id="change-cCOP">—</div>
+        <div id="signal-cCOP"></div>
+      </div>
+      <div class="price-card" id="card-cGHS">
+        <div class="price-sym">CELO/cGHS</div>
+        <div class="price-val" id="price-cGHS">—</div>
+        <div class="price-change" id="change-cGHS">—</div>
+        <div id="signal-cGHS"></div>
+      </div>
     </div>
   </div>
 
@@ -281,7 +317,7 @@ header {
         <div style="display:flex;flex-direction:column;gap:8px;">
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;">
             <span style="font-size:0.8rem;color:var(--muted);">Pairs monitored</span>
-            <span style="font-size:0.85rem;color:var(--text);">cEUR/cUSD, cREAL/cUSD</span>
+            <span style="font-size:0.85rem;color:var(--text);">cEUR, cREAL, cGBP, cKES, cZAR, cNGN, cCOP, cGHS → cUSD</span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;">
             <span style="font-size:0.8rem;color:var(--muted);">Min spread</span>
@@ -352,6 +388,12 @@ const TOKENS = {
   WBTC:  { address: '0xBAAB46E28388d2779e6E31Fd00cF0e5Ad95E327B', decimals: 8,  symbol: 'WBTC' },
   WETH:  { address: '0x122013fd7dF1C6F636a5bb8f03108E876548b455', decimals: 18, symbol: 'WETH' },
   cREAL: { address: '0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787', decimals: 18, symbol: 'cREAL' },
+  cGBP:  { address: '0xccf663b1ff11028f0b19058d0f7b674004a40746', decimals: 18, symbol: 'cGBP' },
+  cKES:  { address: '0x456a3d042c0dbd3db53d5489e98dfb038553b0d0', decimals: 18, symbol: 'cKES' },
+  cZAR:  { address: '0x4c35853a3b4e647fd266f4de678dcc8fec410bf6', decimals: 18, symbol: 'cZAR' },
+  cNGN:  { address: '0xe2702bd97ee33c88c8f6f92da3b733608aa76f71', decimals: 18, symbol: 'cNGN' },
+  cCOP:  { address: '0x8a567e2ae79ca692bd748ab832081c45de4041ea', decimals: 18, symbol: 'cCOP' },
+  cGHS:  { address: '0xfaea5f3404bba20d3cc2f8c4b0a888f55a3c7313', decimals: 18, symbol: 'cGHS' },
 };
 
 // Derived lowercase address map for price lookups
@@ -548,7 +590,7 @@ async function refreshPrices() {
     if (!celoUSD || celoUSD === 0) { log('CELO price unavailable, retrying in 60s', 'warn'); return; }
     const celoData = { price: celoUSD, change24h: celoChange };
 
-    const pairs = ['cUSD', 'cEUR', 'cREAL', 'USDC', 'USDT'];
+    const pairs = ['cUSD', 'cEUR', 'cREAL', 'USDC', 'USDT', 'cGBP', 'cKES', 'cZAR', 'cNGN', 'cCOP', 'cGHS'];
     for (const sym of pairs) {
       // Small delay to avoid rate limiting
       await new Promise(r => setTimeout(r, 300));
