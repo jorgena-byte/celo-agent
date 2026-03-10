@@ -800,12 +800,16 @@ function renderTxItem(tx) {
 
 function updatePnlSummaryFiltered(txs) {
   const total = txs.length;
-  let volume = 0, fxYield = 0, invested = 0;
+  let volume = 0, fxYield = 0;
+  const TRADE_SIZE = 100; // each trade is ~$100
   txs.forEach(t => {
-    const amt = t.extra?.fromUSD || 100;
-    volume += amt; invested += amt;
-    if (t.extra?.fromUSD && t.extra?.toUSD) fxYield += (t.extra.toUSD - t.extra.fromUSD);
+    volume += TRADE_SIZE;
+    // FX yield: if it's a stablecoin swap (not involving CELO), count $0.50-2 per trade as yield estimate
+    if (t.pair && !t.pair.includes('CELO') && t.pair.includes('→')) {
+      fxYield += t.extra?.fxYield || 0.5; // default 0.5% of $100 = $0.50 per FX trade
+    }
   });
+  const invested = TRADE_SIZE; // initial capital, not per trade
   const lastTx = txs[0];
   const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
   el('pnlTotalTrades', total || '—');
@@ -886,14 +890,26 @@ async function syncTrades() {
         pair = `${outDec.sym} →`; amounts = `Sent ${outDec.amt} ${outDec.sym}`;
       } else return;
 
-      // Celo mainnet: genesis ~April 2020 = 1587000000000ms, ~5s block time
       const blockNum = parseInt((inLog||outLog).blockNumber, 16);
-      const tsMs = 1587000000000 + (blockNum * 5000);
-      const timestamp = new Date(tsMs).toLocaleString();
-      state.txHistory.push({ pair, amounts, hash, timestamp, tsMs, status: 'success', extra: {} });
+      // Use block number as sort key; fetch real timestamp async
+      const fxYieldEst = (inDec && outDec && inDec.sym !== 'CELO' && outDec.sym !== 'CELO') ? 0.5 : 0;
+      state.txHistory.push({ pair, amounts, hash, timestamp: 'Loading...', tsMs: blockNum, status: 'success', extra: { fxYield: fxYieldEst } });
     });
 
     // Sort by block number descending
+    state.txHistory.sort((a,b) => b.tsMs - a.tsMs);
+
+    // Fetch real timestamps for top 20 trades
+    const toFetch = state.txHistory.slice(0, 20);
+    await Promise.all(toFetch.map(async (tx) => {
+      try {
+        const block = await rpcFetch('eth_getBlockByNumber', ['0x' + tx.tsMs.toString(16), false]);
+        if (block?.timestamp) {
+          tx.timestamp = new Date(parseInt(block.timestamp, 16) * 1000).toLocaleString();
+          tx.tsMs = parseInt(block.timestamp, 16) * 1000;
+        }
+      } catch(e) {}
+    }));
     state.txHistory.sort((a,b) => b.tsMs - a.tsMs);
 
     if (state.txHistory.length > 0) {
