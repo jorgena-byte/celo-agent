@@ -35,7 +35,7 @@ const CONFIG = {
   BUY_DROP_PCT: 5,
   SELL_RISE_PCT: 10,
   STOP_LOSS_PCT: 15,
-  TRADE_SIZE_USD: 100,
+  TRADE_SIZE_USD: 5,
   SELL_PORTION: 0.4,
   CHECK_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
 
@@ -45,7 +45,7 @@ const CONFIG = {
 };
 
 const TOKENS = {
-  CELO:  { address: '0x471ece3750da237f93b8e339c536989b8978a438', decimals: 18 },
+  CELO:  { address: '0x471ece3750da237f93b8e339c536989b8978a438', decimals: 18 }, // CELO is ERC20 on Celo network
   cUSD:  { address: '0x765de816845861e75a25fca122bb6898b8b1282a', decimals: 18 },
   cEUR:  { address: '0xd8763cba276a3738e6de85b4b3bf5fded6d6ca73', decimals: 18 },
   cREAL: { address: '0xe8537a3d056da446677b9e9d6c5db704eaab4787', decimals: 18 },
@@ -57,6 +57,7 @@ const TOKENS = {
   cNGN:  { address: '0xe2702bd97ee33c88c8f6f92da3b733608aa76f71', decimals: 18 },
   cCOP:  { address: '0x8a567e2ae79ca692bd748ab832081c45de4041ea', decimals: 18 },
   cGBP:  { address: '0xccf663b1ff11028f0b19058d0f7b674004a40746', decimals: 18 },
+  WCELO: { address: '0x471ece3750da237f93b8e339c536989b8978a438', decimals: 18 }, // CELO is its own ERC20
 };
 
 // ============================================================
@@ -139,71 +140,62 @@ async function fetchRealFxRates() {
 // SAFE EXECUTION
 // ============================================================
 async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
-  console.log(`Executing Safe swap: ${amount} ${fromSymbol} → ${toSymbol}`);
+  console.log(`Executing swap: ${amount} ${fromSymbol} → ${toSymbol}`);
 
   const fromToken = TOKENS[fromSymbol];
-  const toToken = TOKENS[toSymbol];
+  const toToken   = TOKENS[toSymbol];
+  if (!fromToken || !toToken) throw new Error(`Unknown token: ${fromSymbol} or ${toSymbol}`);
 
-  const amountInUnits = ethers.utils.parseUnits(amount.toString(), fromToken.decimals);
+  const provider = new ethers.providers.JsonRpcProvider(CONFIG.CELO_RPC);
+  const wallet   = new ethers.Wallet(CONFIG.EXECUTOR_PRIVATE_KEY, provider);
 
-  const safeInterface = new ethers.utils.Interface([
-    'function execTransactionFromModule(address to, uint256 value, bytes calldata data, uint8 operation) returns (bool success)'
-  ]);
+  const erc20Abi = [
+    'function balanceOf(address) view returns (uint256)',
+    'function approve(address,uint256) returns (bool)',
+    'function allowance(address,address) view returns (uint256)'
+  ];
 
-  const erc20Interface = new ethers.utils.Interface([
-    'function approve(address spender, uint256 amount) returns (bool)'
-  ]);
+  const fromContract = new ethers.Contract(fromToken.address, erc20Abi, wallet);
 
-  const uniswapInterface = new ethers.utils.Interface([
-    'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) returns (uint256 amountOut)'
-  ]);
+  // Check balance
+  const balance = await fromContract.balanceOf(wallet.address);
+  const amountIn = ethers.utils.parseUnits(amount.toString(), fromToken.decimals);
 
-  // Checksum all addresses for ethers v5 compatibility
-  const toAddr     = ethers.utils.getAddress(toToken.address);
-  const fromAddr   = ethers.utils.getAddress(fromToken.address);
-  const routerAddr = ethers.utils.getAddress(CONFIG.UNISWAP_ROUTER);
-  const safeAddr   = CONFIG.SAFE_ADDRESS;
+  if (balance.lt(amountIn)) {
+    throw new Error(`Insufficient ${fromSymbol} balance: have ${ethers.utils.formatUnits(balance, fromToken.decimals)}, need ${amount}`);
+  }
 
-  const safeContract = new ethers.Contract(safeAddr, safeInterface, executorWallet);
+  const routerAddress = CONFIG.UNISWAP_ROUTER;
+  const routerAbi = [
+    'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) returns (uint256)'
+  ];
+  const router = new ethers.Contract(routerAddress, routerAbi, wallet);
 
   // Approve
-  const approveData = erc20Interface.encodeFunctionData('approve', [routerAddr, amountInUnits]);
-  const approveTx = await safeContract.execTransactionFromModule(fromAddr, 0, approveData, 0, { gasLimit: 200000 });
-  await approveTx.wait();
-  console.log(`Approval confirmed: ${approveTx.hash}`);
+  const allowance = await fromContract.allowance(wallet.address, routerAddress);
+  if (allowance.lt(amountIn)) {
+    const approveTx = await fromContract.approve(routerAddress, ethers.constants.MaxUint256);
+    await approveTx.wait();
+    console.log('Approval confirmed:', approveTx.hash);
+  }
 
   // Swap
-  const deadline = Math.floor(Date.now() / 1000) + 300;
-  const swapData = uniswapInterface.encodeFunctionData('exactInputSingle', [{
-    tokenIn: fromAddr,
-    tokenOut: toAddr,
+  const params = {
+    tokenIn:  fromToken.address,
+    tokenOut: toToken.address,
     fee: 3000,
-    recipient: safeAddr,
-    deadline,
-    amountIn: amountInUnits,
+    recipient: wallet.address,
+    deadline: Math.floor(Date.now() / 1000) + 300,
+    amountIn,
     amountOutMinimum: 0,
     sqrtPriceLimitX96: 0
-  }]);
+  };
 
-  const swapTx = await safeContract.execTransactionFromModule(routerAddr, 0, swapData, 0, { gasLimit: 500000 });
+  const swapTx = await router.exactInputSingle(params);
   await swapTx.wait();
-  console.log(`Swap confirmed: ${swapTx.hash}`);
+  console.log('Swap confirmed:', swapTx.hash);
 
-  // Record trade
-  // Estimate FX yield: amount * spread (passed in as extra param, default 0)
-  const estimatedYield = amount * (extraSpread || 0);
-  tradeHistory.unshift({
-    timestamp: new Date().toISOString(),
-    fromSymbol, toSymbol, amount,
-    txHash: swapTx.hash,
-    fxYield: estimatedYield
-  });
-
-  await sendTelegram(`✅ <b>AUTO TRADE EXECUTED</b>
-
-🔄 ${amount} ${fromSymbol} → ${toSymbol}
-🏦 From Safe wallet
-🔗 <a href="https://celoscan.io/tx/${swapTx.hash}">View on CeloScan</a>`);
+  await sendTelegram(`✅ <b>AUTO TRADE EXECUTED</b>\n\n🔄 ${amount} ${fromSymbol} → ${toSymbol}\n👛 Executor wallet\n🔗 <a href="https://celoscan.io/tx/${swapTx.hash}">View on CeloScan</a>`);
 
   // Log trade to file
   const trade = { pair: `${fromSymbol} → ${toSymbol}`, amount, hash: swapTx.hash, timestamp: new Date().toISOString(), status: 'success' };
@@ -218,6 +210,7 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
 
   return swapTx.hash;
 }
+
 
 // ============================================================
 // CELO TRADING STRATEGY
@@ -273,47 +266,78 @@ async function checkCeloStrategy() {
 async function checkFxStrategy() {
   const fxRates = await fetchRealFxRates();
 
+  // Check executor CELO balance
+  const provider = new ethers.providers.JsonRpcProvider(CONFIG.CELO_RPC);
+  const wallet = new ethers.Wallet(CONFIG.EXECUTOR_PRIVATE_KEY, provider);
+  const celoBalance = await provider.getBalance(wallet.address);
+  const celoBalanceNum = parseFloat(ethers.utils.formatEther(celoBalance));
+
+  if (celoBalanceNum < 2) {
+    console.log(`Low CELO balance: ${celoBalanceNum.toFixed(2)} CELO — skipping FX trades`);
+    return;
+  }
+
+  // Use CELO price to determine trade size in CELO
+  const celoPrice = await fetchCeloPrice();
+  const tradeUSD = CONFIG.FX_TRADE_SIZE_USD;
+  const tradeCELO = (tradeUSD / celoPrice).toFixed(2);
+
   const pairs = [
-    { name: 'EURUSD', fromSym: 'cEUR',  toSym: 'cUSD', realRate: fxRates.EURUSD },
-    { name: 'BRLUSD', fromSym: 'cREAL', toSym: 'cUSD', realRate: fxRates.BRLUSD },
-    { name: 'GBPUSD', fromSym: 'cGBP',  toSym: 'cUSD', realRate: fxRates.GBPUSD },
-    { name: 'KESUSD', fromSym: 'cKES',  toSym: 'cUSD', realRate: fxRates.KESUSD },
-    { name: 'ZARUSD', fromSym: 'cZAR',  toSym: 'cUSD', realRate: fxRates.ZARUSD },
-    { name: 'NGNUSD', fromSym: 'cNGN',  toSym: 'cUSD', realRate: fxRates.NGNUSD },
-    { name: 'COPUSD', fromSym: 'cCOP',  toSym: 'cUSD', realRate: fxRates.COPUSD },
-    { name: 'GHSUSD', fromSym: 'cGHS',  toSym: 'cUSD', realRate: fxRates.GHSUSD },
+    { name: 'EURUSD', stableSym: 'cEUR',  realRate: fxRates.EURUSD },
+    { name: 'BRLUSD', stableSym: 'cREAL', realRate: fxRates.BRLUSD },
+    { name: 'GBPUSD', stableSym: 'cGBP',  realRate: fxRates.GBPUSD },
+    { name: 'KESUSD', stableSym: 'cKES',  realRate: fxRates.KESUSD },
+    { name: 'ZARUSD', stableSym: 'cZAR',  realRate: fxRates.ZARUSD },
+    { name: 'NGNUSD', stableSym: 'cNGN',  realRate: fxRates.NGNUSD },
+    { name: 'COPUSD', stableSym: 'cCOP',  realRate: fxRates.COPUSD },
+    { name: 'GHSUSD', stableSym: 'cGHS',  realRate: fxRates.GHSUSD },
   ];
 
   for (const pair of pairs) {
-    const fromPrice = await fetchTokenPrice(pair.fromSym);
-    const toPrice = await fetchTokenPrice(pair.toSym);
-    if (!fromPrice || !toPrice) continue;
+    const stablePrice = await fetchTokenPrice(pair.stableSym);
+    if (!stablePrice) continue;
 
-    const onchainRate = fromPrice / toPrice;
-    const spread = ((onchainRate - pair.realRate) / pair.realRate) * 100;
+    // onchain rate: how many stablecoins per 1 USD (via CELO)
+    const onchainRate = stablePrice / celoPrice * pair.realRate;
+    const spread = ((onchainRate - 1) / 1) * 100;
     const absSpread = Math.abs(spread);
 
-    console.log(`FX ${pair.name}: onchain=${onchainRate.toFixed(5)} real=${pair.realRate.toFixed(5)} spread=${spread.toFixed(3)}%`);
+    console.log(`FX ${pair.name}: spread=${spread.toFixed(3)}%`);
 
     if (absSpread >= CONFIG.FX_MIN_SPREAD_PCT) {
       const now = Date.now();
       if (lastFxTrade[pair.name] && now - lastFxTrade[pair.name] < 30 * 60 * 1000) continue;
       lastFxTrade[pair.name] = now;
 
-      const buySym = spread < 0 ? pair.fromSym : pair.toSym;
-      const sellSym = spread < 0 ? pair.toSym : pair.fromSym;
+      // Buy the stable that is cheap (relative to real FX rate)
+      const action = spread < 0 ? `BUY ${pair.stableSym} with ${tradeCELO} CELO` : `SELL ${pair.stableSym} for CELO`;
 
-      await sendTelegram(`💱 <b>FX OPPORTUNITY</b>\nPair: ${pair.fromSym}/${pair.toSym}\nSpread: ${absSpread.toFixed(3)}%\nAction: BUY ${buySym} with $${CONFIG.FX_TRADE_SIZE_USD}`);
+      await sendTelegram(`💱 <b>FX OPPORTUNITY</b>\nPair: ${pair.stableSym}/CELO\nSpread: ${absSpread.toFixed(3)}%\nAction: ${action}`);
 
       try {
-        await executeSafeSwap(sellSym, buySym, CONFIG.FX_TRADE_SIZE_USD, absSpread / 100);
-        totalFxYield += (CONFIG.FX_TRADE_SIZE_USD * absSpread) / 100;
+        if (spread < 0) {
+          // Stable is cheap — buy it with CELO
+          await executeSafeSwap('CELO', pair.stableSym, tradeCELO);
+        } else {
+          // Stable is expensive — check if we have it, sell for CELO
+          const erc20 = ['function balanceOf(address) view returns (uint256)'];
+          const stableToken = TOKENS[pair.stableSym];
+          if (!stableToken) continue;
+          const stableContract = new ethers.Contract(stableToken.address, erc20, provider);
+          const bal = await stableContract.balanceOf(wallet.address);
+          const balNum = parseFloat(ethers.utils.formatUnits(bal, stableToken.decimals));
+          if (balNum >= parseFloat(tradeCELO)) {
+            await executeSafeSwap(pair.stableSym, 'CELO', tradeCELO);
+          }
+        }
+        totalFxYield += (tradeUSD * absSpread) / 100;
       } catch(e) {
         await sendTelegram(`❌ FX trade failed: ${e.message}`);
       }
     }
   }
 }
+
 
 // ============================================================
 // DAILY REPORT
