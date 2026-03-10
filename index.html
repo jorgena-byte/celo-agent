@@ -833,6 +833,7 @@ async function syncTrades() {
   status.textContent = 'Fetching trades from blockchain...';
 
   const SAFE = SAFE_ADDRESS.toLowerCase();
+  const EXECUTOR = '0xd896f9b50a80f20040e579a551e3ccbf326d6810';
   let loaded = false;
 
   try {
@@ -846,16 +847,22 @@ async function syncTrades() {
     const latest = parseInt(latestHex, 16);
     const fromBlock = '0x' + Math.max(0, latest - 2000000).toString(16); // ~115 days
 
-    const [logsIn, logsOut] = await Promise.all([
+    const executorTopicTo   = '0x000000000000000000000000' + EXECUTOR.slice(2);
+    const executorTopicFrom = '0x000000000000000000000000' + EXECUTOR.slice(2);
+
+    const [logsIn, logsOut, execLogsIn, execLogsOut] = await Promise.all([
       rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, safeTopicTo] }]),
-      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, safeTopicFrom, null] }])
+      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, safeTopicFrom, null] }]),
+      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, executorTopicTo] }]),
+      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, executorTopicFrom, null] }])
     ]);
 
     // Group by txHash
     const grouped = {};
-    [...(logsIn||[]), ...(logsOut||[])].forEach(log => {
+    [...(logsIn||[]), ...(logsOut||[]), ...(execLogsIn||[]), ...(execLogsOut||[])].forEach(log => {
       if (!grouped[log.transactionHash]) grouped[log.transactionHash] = { ins: [], outs: [] };
-      const isIn = log.topics[2]?.toLowerCase().includes(SAFE.slice(2));
+      const toAddr = log.topics[2]?.toLowerCase() || '';
+      const isIn = toAddr.includes(SAFE.slice(2)) || toAddr.includes(EXECUTOR.slice(2));
       if (isIn) grouped[log.transactionHash].ins.push(log);
       else grouped[log.transactionHash].outs.push(log);
     });
