@@ -832,94 +832,41 @@ async function syncTrades() {
   btn.textContent = '⏳ SYNCING...';
   btn.disabled = true;
   status.style.display = 'block';
-  status.textContent = 'Fetching trades from blockchain...';
-
-  const SAFE     = SAFE_ADDRESS.toLowerCase();
-  const EXECUTOR = '0xd896f9b50a80f20040e579a551e3ccbf326d6810';
-  const CELOSCAN = 'https://api.celoscan.io/api';
-  let allTxs = [];
+  status.textContent = 'Fetching trades from server...';
 
   try {
-    // Fetch token transfers for BOTH wallets from CeloScan
-    const [safeRes, execRes] = await Promise.all([
-      fetch(`${CELOSCAN}?module=account&action=tokentx&address=${SAFE}&sort=desc&offset=100`),
-      fetch(`${CELOSCAN}?module=account&action=tokentx&address=${EXECUTOR}&sort=desc&offset=100`)
-    ]);
-    const safeData = await safeRes.json();
-    const execData = await execRes.json();
+    const res = await fetch('http://174.138.5.18:3001/trades');
+    const trades = await res.json();
 
-    const safeTxs = safeData.status === '1' ? safeData.result : [];
-    const execTxs = execData.status === '1' ? execData.result : [];
-
-    // Group by txHash
-    const grouped = {};
-    [...safeTxs, ...execTxs].forEach(tx => {
-      const h = tx.hash;
-      if (!grouped[h]) grouped[h] = { ins: [], outs: [], ts: tx.timeStamp };
-      const toMe = tx.to.toLowerCase() === SAFE || tx.to.toLowerCase() === EXECUTOR;
-      if (toMe) grouped[h].ins.push(tx);
-      else grouped[h].outs.push(tx);
-    });
-
-    state.txHistory = [];
-    const seen = new Set();
-
-    for (const [hash, {ins, outs, ts}] of Object.entries(grouped)) {
-      if (seen.has(hash)) continue;
-      seen.add(hash);
-
-      const inTx  = ins[0];
-      const outTx = outs[0];
-      if (!inTx && !outTx) continue;
-
-      // Skip pure CELO receives with no outgoing (wallet funding)
-      if (inTx && !outTx && inTx.tokenSymbol === 'CELO') continue;
-
-      let pair, amounts, fxYield = 0;
-
-      if (inTx && outTx) {
-        const inAmt  = parseFloat(inTx.value)  / Math.pow(10, parseInt(inTx.tokenDecimal));
-        const outAmt = parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal));
-        pair    = `${outTx.tokenSymbol} → ${inTx.tokenSymbol}`;
-        amounts = `${outAmt.toFixed(2)} ${outTx.tokenSymbol} → ${inAmt.toFixed(2)} ${inTx.tokenSymbol}`;
-        // FX yield for stablecoin swaps
-        if (inTx.tokenSymbol !== 'CELO' && outTx.tokenSymbol !== 'CELO') {
-          fxYield = inAmt - outAmt;
-        }
-      } else if (inTx) {
-        const inAmt = parseFloat(inTx.value) / Math.pow(10, parseInt(inTx.tokenDecimal));
-        pair = `→ ${inTx.tokenSymbol}`;
-        amounts = `Received ${inAmt.toFixed(2)} ${inTx.tokenSymbol}`;
-      } else {
-        const outAmt = parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal));
-        pair = `${outTx.tokenSymbol} →`;
-        amounts = `Sent ${outAmt.toFixed(2)} ${outTx.tokenSymbol}`;
-      }
-
-      const tsMs = parseInt(ts) * 1000;
-      const timestamp = new Date(tsMs).toLocaleString();
-      state.txHistory.push({ pair, amounts, hash, timestamp, tsMs, status: 'success', extra: { fxYield } });
-    }
-
-    state.txHistory.sort((a,b) => b.tsMs - a.tsMs);
+    state.txHistory = trades.map(t => ({
+      pair: t.pair,
+      amounts: `${t.amount} ${t.pair}`,
+      hash: t.hash,
+      timestamp: new Date(t.timestamp).toLocaleString(),
+      tsMs: new Date(t.timestamp).getTime(),
+      status: t.status || 'success',
+      extra: { fxYield: t.fxYield || 0 }
+    }));
 
     if (state.txHistory.length > 0) {
-      try { localStorage.setItem('ja_tx_history', JSON.stringify(state.txHistory.slice(0,100))); } catch(e) {}
-      status.textContent = `✅ Synced ${state.txHistory.length} transactions from blockchain.`;
+      try { localStorage.setItem('ja_tx_history', JSON.stringify(state.txHistory)); } catch(e) {}
+      status.textContent = `✅ Synced ${state.txHistory.length} trades from server.`;
     } else {
-      status.textContent = 'No trades found yet.';
+      status.textContent = 'No trades yet — bot is running and monitoring.';
     }
   } catch(e) {
-    console.error('Sync error:', e);
-    status.textContent = 'Sync error: ' + e.message;
-    // Try localStorage fallback
+    // Fallback to localStorage
     try {
       const saved = JSON.parse(localStorage.getItem('ja_tx_history') || '[]');
       if (saved.length > 0) {
         state.txHistory = saved;
         status.textContent = `Loaded ${saved.length} trades from local storage.`;
+      } else {
+        status.textContent = 'No trades found yet.';
       }
-    } catch(e2) {}
+    } catch(e2) {
+      status.textContent = 'Could not connect to server.';
+    }
   }
 
   filterTrades(currentFilter);

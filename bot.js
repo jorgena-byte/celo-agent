@@ -1,4 +1,22 @@
 const { ethers } = require('ethers');
+const fs = require('fs');
+const http = require('http');
+
+// Simple HTTP server to serve trades.json to the dashboard
+http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Content-Type', 'application/json');
+  if (req.url === '/trades') {
+    try {
+      const trades = fs.existsSync('/root/trading-bot/trades.json')
+        ? fs.readFileSync('/root/trading-bot/trades.json', 'utf8')
+        : '[]';
+      res.end(trades);
+    } catch(e) { res.end('[]'); }
+  } else {
+    res.end(JSON.stringify({ status: 'JA Trading Agent running' }));
+  }
+}).listen(3001, () => console.log('Trade API running on port 3001'));
 const fetch = require('node-fetch');
 
 // ============================================================
@@ -6,9 +24,9 @@ const fetch = require('node-fetch');
 // ============================================================
 const CONFIG = {
   CELO_RPC: 'https://forno.celo.org',
-  SAFE_ADDRESS: '0xa7b0ceAD940056cc9aFe8034F1cc507A048be8CF',
+  SAFE_ADDRESS: '0xa7b0cead940056cc9afe8034f1cc507a048be8cf',
   EXECUTOR_PRIVATE_KEY: 'ca156e18ebcd6709f5dd50dd041b7b96cf8e5a437a41598a7c333f20da5016ca',
-  EXECUTOR_ADDRESS: '0xD896F9b50A80F20040E579A551E3CCbF326D6810',
+  EXECUTOR_ADDRESS: '0xd896f9b50a80f20040e579a551e3ccbf326d6810',
   TELEGRAM_TOKEN: '8751112209:AAF600GfxRQtVzyOMYr6A8sthVyMWEGxljc',
   TELEGRAM_CHAT_ID: '2113323141',
   UNISWAP_ROUTER: '0x5615CDAB10dC425A742D643D949a7f474c01Abc2',
@@ -144,7 +162,7 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
   const toAddr     = ethers.utils.getAddress(toToken.address);
   const fromAddr   = ethers.utils.getAddress(fromToken.address);
   const routerAddr = ethers.utils.getAddress(CONFIG.UNISWAP_ROUTER);
-  const safeAddr   = ethers.utils.getAddress(CONFIG.SAFE_ADDRESS);
+  const safeAddr   = CONFIG.SAFE_ADDRESS;
 
   const safeContract = new ethers.Contract(safeAddr, safeInterface, executorWallet);
 
@@ -186,6 +204,17 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
 🔄 ${amount} ${fromSymbol} → ${toSymbol}
 🏦 From Safe wallet
 🔗 <a href="https://celoscan.io/tx/${swapTx.hash}">View on CeloScan</a>`);
+
+  // Log trade to file
+  const trade = { pair: `${fromSymbol} → ${toSymbol}`, amount, hash: swapTx.hash, timestamp: new Date().toISOString(), status: 'success' };
+  try {
+    let trades = [];
+    if (fs.existsSync('/root/trading-bot/trades.json')) {
+      trades = JSON.parse(fs.readFileSync('/root/trading-bot/trades.json', 'utf8'));
+    }
+    trades.unshift(trade);
+    fs.writeFileSync('/root/trading-bot/trades.json', JSON.stringify(trades.slice(0, 200)));
+  } catch(e) { console.error('Trade log error:', e.message); }
 
   return swapTx.hash;
 }
