@@ -33,6 +33,12 @@ const TOKENS = {
   cREAL: { address: '0xe8537a3d056da446677b9e9d6c5db704eaab4787', decimals: 18 },
   USDT:  { address: '0x617f3112bf5397d0467d315cc709ef968d9ba546', decimals: 6  },
   USDC:  { address: '0xef4229c8c3250c675f21bcefa42f58efbff6002a', decimals: 6  },
+  cKES:  { address: '0x456a3d042c0dbd3db53d5489e98dfb038553b0d0', decimals: 18 },
+  cZAR:  { address: '0x4c35853a3b4e647fd266f4de678dcc8fec410bf6', decimals: 18 },
+  cGHS:  { address: '0xfaea5f3404bba20d3cc2f8c4b0a888f55a3c7313', decimals: 18 },
+  cNGN:  { address: '0xe2702bd97ee33c88c8f6f92da3b733608aa76f71', decimals: 18 },
+  cCOP:  { address: '0x8a567e2ae79ca692bd748ab832081c45de4041ea', decimals: 18 },
+  cGBP:  { address: '0xccf663b1ff11028f0b19058d0f7b674004a40746', decimals: 18 },
 };
 
 // ============================================================
@@ -95,9 +101,19 @@ async function fetchRealFxRates() {
     return {
       EURUSD: 1 / data.rates.EUR,
       BRLUSD: 1 / data.rates.BRL,
+      GBPUSD: 1 / data.rates.GBP,
+      KESUSD: 1 / data.rates.KES,
+      ZARUSD: 1 / data.rates.ZAR,
+      NGNUSD: 1 / data.rates.NGN,
+      COPUSD: 1 / data.rates.COP,
+      GHSUSD: 1 / data.rates.GHS,
     };
   } catch(e) {
-    return { EURUSD: 1.08, BRLUSD: 0.19 };
+    return {
+      EURUSD: 1.08, BRLUSD: 0.19, GBPUSD: 1.27,
+      KESUSD: 0.0077, ZARUSD: 0.054, NGNUSD: 0.00065,
+      COPUSD: 0.00024, GHSUSD: 0.067,
+    };
   }
 }
 
@@ -229,8 +245,14 @@ async function checkFxStrategy() {
   const fxRates = await fetchRealFxRates();
 
   const pairs = [
-    { name: 'EURUSD', fromSym: 'cEUR', toSym: 'cUSD', realRate: fxRates.EURUSD },
+    { name: 'EURUSD', fromSym: 'cEUR',  toSym: 'cUSD', realRate: fxRates.EURUSD },
     { name: 'BRLUSD', fromSym: 'cREAL', toSym: 'cUSD', realRate: fxRates.BRLUSD },
+    { name: 'GBPUSD', fromSym: 'cGBP',  toSym: 'cUSD', realRate: fxRates.GBPUSD },
+    { name: 'KESUSD', fromSym: 'cKES',  toSym: 'cUSD', realRate: fxRates.KESUSD },
+    { name: 'ZARUSD', fromSym: 'cZAR',  toSym: 'cUSD', realRate: fxRates.ZARUSD },
+    { name: 'NGNUSD', fromSym: 'cNGN',  toSym: 'cUSD', realRate: fxRates.NGNUSD },
+    { name: 'COPUSD', fromSym: 'cCOP',  toSym: 'cUSD', realRate: fxRates.COPUSD },
+    { name: 'GHSUSD', fromSym: 'cGHS',  toSym: 'cUSD', realRate: fxRates.GHSUSD },
   ];
 
   for (const pair of pairs) {
