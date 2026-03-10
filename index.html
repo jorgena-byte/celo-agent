@@ -836,128 +836,91 @@ async function syncTrades() {
 
   const SAFE     = SAFE_ADDRESS.toLowerCase();
   const EXECUTOR = '0xd896f9b50a80f20040e579a551e3ccbf326d6810';
-  let loaded = false;
+  const CELOSCAN = 'https://api.celoscan.io/api';
+  let allTxs = [];
 
   try {
-    const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-    const safeTo   = '0x000000000000000000000000' + SAFE.slice(2);
-    const safeFrom = '0x000000000000000000000000' + SAFE.slice(2);
-    const execTo   = '0x000000000000000000000000' + EXECUTOR.slice(2);
-    const execFrom = '0x000000000000000000000000' + EXECUTOR.slice(2);
-
-    const latestHex = await rpcFetch('eth_blockNumber', []);
-    const latest = parseInt(latestHex, 16);
-    const fromBlock = '0x' + Math.max(0, latest - 2000000).toString(16);
-
-    const [logsIn, logsOut, execIn, execOut] = await Promise.all([
-      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, safeTo] }]),
-      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, safeFrom, null] }]),
-      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, execTo] }]),
-      rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, execFrom, null] }])
+    // Fetch token transfers for BOTH wallets from CeloScan
+    const [safeRes, execRes] = await Promise.all([
+      fetch(`${CELOSCAN}?module=account&action=tokentx&address=${SAFE}&sort=desc&offset=100`),
+      fetch(`${CELOSCAN}?module=account&action=tokentx&address=${EXECUTOR}&sort=desc&offset=100`)
     ]);
+    const safeData = await safeRes.json();
+    const execData = await execRes.json();
 
-    // Group ALL logs by txHash
+    const safeTxs = safeData.status === '1' ? safeData.result : [];
+    const execTxs = execData.status === '1' ? execData.result : [];
+
+    // Group by txHash
     const grouped = {};
-    const allLogs = [...(logsIn||[]), ...(logsOut||[]), ...(execIn||[]), ...(execOut||[])];
-    allLogs.forEach(log => {
-      const h = log.transactionHash;
-      if (!grouped[h]) grouped[h] = { ins: [], outs: [] };
-      const toAddr = (log.topics[2] || '').toLowerCase();
-      const isIn = toAddr.includes(SAFE.slice(2)) || toAddr.includes(EXECUTOR.slice(2));
-      if (isIn) grouped[h].ins.push(log);
-      else grouped[h].outs.push(log);
+    [...safeTxs, ...execTxs].forEach(tx => {
+      const h = tx.hash;
+      if (!grouped[h]) grouped[h] = { ins: [], outs: [], ts: tx.timeStamp };
+      const toMe = tx.to.toLowerCase() === SAFE || tx.to.toLowerCase() === EXECUTOR;
+      if (toMe) grouped[h].ins.push(tx);
+      else grouped[h].outs.push(tx);
     });
 
-    const addrToSym = Object.fromEntries(
-      Object.entries(TOKENS).map(([s,t]) => [t.address.toLowerCase(), s])
-    );
-
-    const decodeAmt = (log) => {
-      const sym = addrToSym[log.address.toLowerCase()];
-      if (!sym) return null;
-      const decimals = TOKENS[sym]?.decimals || 18;
-      const amt = parseFloat((parseInt(log.data, 16) / Math.pow(10, decimals)).toFixed(4));
-      return { sym, amt };
-    };
-
     state.txHistory = [];
-    const seenHashes = new Set();
+    const seen = new Set();
 
-    for (const [hash, {ins, outs}] of Object.entries(grouped)) {
-      if (seenHashes.has(hash)) continue;
-      seenHashes.add(hash);
+    for (const [hash, {ins, outs, ts}] of Object.entries(grouped)) {
+      if (seen.has(hash)) continue;
+      seen.add(hash);
 
-      // Use first in and first out log only (dedup within tx)
-      const inLog  = ins[0];
-      const outLog = outs[0];
-      if (!inLog && !outLog) continue;
+      const inTx  = ins[0];
+      const outTx = outs[0];
+      if (!inTx && !outTx) continue;
 
-      const inDec  = inLog  ? decodeAmt(inLog)  : null;
-      const outDec = outLog ? decodeAmt(outLog) : null;
-
-      // Skip if we can't identify either side
-      if (!inDec && !outDec) continue;
-
-      // Skip pure CELO receives with no outgoing (just wallet funding, not trades)
-      if (inDec && !outDec && inDec.sym === 'CELO') continue;
+      // Skip pure CELO receives with no outgoing (wallet funding)
+      if (inTx && !outTx && inTx.tokenSymbol === 'CELO') continue;
 
       let pair, amounts, fxYield = 0;
 
-      if (inDec && outDec) {
-        pair    = `${outDec.sym} → ${inDec.sym}`;
-        amounts = `${outDec.amt} ${outDec.sym} → ${inDec.amt} ${inDec.sym}`;
-        // FX yield: stablecoin swaps where both sides are not CELO
-        if (inDec.sym !== 'CELO' && outDec.sym !== 'CELO') {
-          // Estimate: received USD value vs sent USD value
-          fxYield = inDec.amt - outDec.amt; // crude estimate, both ~= 1 USD
+      if (inTx && outTx) {
+        const inAmt  = parseFloat(inTx.value)  / Math.pow(10, parseInt(inTx.tokenDecimal));
+        const outAmt = parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal));
+        pair    = `${outTx.tokenSymbol} → ${inTx.tokenSymbol}`;
+        amounts = `${outAmt.toFixed(2)} ${outTx.tokenSymbol} → ${inAmt.toFixed(2)} ${inTx.tokenSymbol}`;
+        // FX yield for stablecoin swaps
+        if (inTx.tokenSymbol !== 'CELO' && outTx.tokenSymbol !== 'CELO') {
+          fxYield = inAmt - outAmt;
         }
-      } else if (inDec) {
-        pair = `→ ${inDec.sym}`; amounts = `Received ${inDec.amt} ${inDec.sym}`;
+      } else if (inTx) {
+        const inAmt = parseFloat(inTx.value) / Math.pow(10, parseInt(inTx.tokenDecimal));
+        pair = `→ ${inTx.tokenSymbol}`;
+        amounts = `Received ${inAmt.toFixed(2)} ${inTx.tokenSymbol}`;
       } else {
-        pair = `${outDec.sym} →`; amounts = `Sent ${outDec.amt} ${outDec.sym}`;
+        const outAmt = parseFloat(outTx.value) / Math.pow(10, parseInt(outTx.tokenDecimal));
+        pair = `${outTx.tokenSymbol} →`;
+        amounts = `Sent ${outAmt.toFixed(2)} ${outTx.tokenSymbol}`;
       }
 
-      const blockNum = parseInt((inLog||outLog).blockNumber, 16);
-      state.txHistory.push({ pair, amounts, hash, timestamp: 'Loading...', tsMs: blockNum, status: 'success', extra: { fxYield } });
+      const tsMs = parseInt(ts) * 1000;
+      const timestamp = new Date(tsMs).toLocaleString();
+      state.txHistory.push({ pair, amounts, hash, timestamp, tsMs, status: 'success', extra: { fxYield } });
     }
 
-    // Sort newest first
-    state.txHistory.sort((a,b) => b.tsMs - a.tsMs);
-
-    // Fetch real timestamps for top 20
-    await Promise.all(state.txHistory.slice(0, 20).map(async (tx) => {
-      try {
-        const block = await rpcFetch('eth_getBlockByNumber', ['0x' + tx.tsMs.toString(16), false]);
-        if (block?.timestamp) {
-          tx.timestamp = new Date(parseInt(block.timestamp, 16) * 1000).toLocaleString();
-          tx.tsMs = parseInt(block.timestamp, 16) * 1000;
-        }
-      } catch(e) {}
-    }));
     state.txHistory.sort((a,b) => b.tsMs - a.tsMs);
 
     if (state.txHistory.length > 0) {
       try { localStorage.setItem('ja_tx_history', JSON.stringify(state.txHistory.slice(0,100))); } catch(e) {}
       status.textContent = `✅ Synced ${state.txHistory.length} transactions from blockchain.`;
-      loaded = true;
+    } else {
+      status.textContent = 'No trades found yet.';
     }
   } catch(e) {
-    console.error('RPC sync error:', e);
-    status.textContent = 'RPC error: ' + e.message;
-  }
-
-  if (!loaded) {
+    console.error('Sync error:', e);
+    status.textContent = 'Sync error: ' + e.message;
+    // Try localStorage fallback
     try {
       const saved = JSON.parse(localStorage.getItem('ja_tx_history') || '[]');
       if (saved.length > 0) {
         state.txHistory = saved;
         status.textContent = `Loaded ${saved.length} trades from local storage.`;
-        loaded = true;
       }
-    } catch(e) {}
+    } catch(e2) {}
   }
-
-  if (!loaded) status.textContent = 'No trades found yet.';
 
   filterTrades(currentFilter);
   btn.textContent = '🔄 SYNC';
