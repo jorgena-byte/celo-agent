@@ -197,7 +197,7 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
 
   await sendTelegram(`✅ <b>AUTO TRADE EXECUTED</b>\n\n🔄 ${amount} ${fromSymbol} → ${toSymbol}\n👛 Executor wallet\n🔗 <a href="https://celoscan.io/tx/${swapTx.hash}">View on CeloScan</a>`);
 
-  // Log trade to file
+  // Log trade to file AND push to GitHub
   const trade = { pair: `${fromSymbol} → ${toSymbol}`, amount, hash: swapTx.hash, timestamp: new Date().toISOString(), status: 'success' };
   try {
     let trades = [];
@@ -205,7 +205,10 @@ async function executeSafeSwap(fromSymbol, toSymbol, amount, extraSpread = 0) {
       trades = JSON.parse(fs.readFileSync('/root/trading-bot/trades.json', 'utf8'));
     }
     trades.unshift(trade);
-    fs.writeFileSync('/root/trading-bot/trades.json', JSON.stringify(trades.slice(0, 200)));
+    const tradesJson = JSON.stringify(trades.slice(0, 200));
+    fs.writeFileSync('/root/trading-bot/trades.json', tradesJson);
+    // Push to GitHub so dashboard can read it over HTTPS
+    await pushTradesToGitHub(tradesJson);
   } catch(e) { console.error('Trade log error:', e.message); }
 
   return swapTx.hash;
@@ -342,6 +345,27 @@ async function checkFxStrategy() {
 // ============================================================
 // DAILY REPORT
 // ============================================================
+async function pushTradesToGitHub(tradesJson) {
+  try {
+    const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+    if (!GITHUB_TOKEN) return;
+    const encoded = Buffer.from(tradesJson).toString('base64');
+    // Get current file SHA
+    const getRes = await fetch('https://api.github.com/repos/jorgena-byte/celo-agent/contents/trades.json', {
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const getData = await getRes.json();
+    const sha = getData.sha;
+    // Update file
+    await fetch('https://api.github.com/repos/jorgena-byte/celo-agent/contents/trades.json', {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'update trades', content: encoded, sha })
+    });
+    console.log('Trades pushed to GitHub');
+  } catch(e) { console.error('GitHub push error:', e.message); }
+}
+
 async function sendDailyReport() {
   const now = new Date();
   const yesterday = new Date();

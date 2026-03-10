@@ -835,7 +835,7 @@ async function syncTrades() {
   status.textContent = 'Fetching trades from server...';
 
   try {
-    const res = await fetch('http://174.138.5.18/trades');
+    const res = await fetch('https://raw.githubusercontent.com/jorgena-byte/celo-agent/main/trades.json?t=' + Date.now());
     const trades = await res.json();
 
     state.txHistory = trades.map(t => ({
