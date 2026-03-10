@@ -798,7 +798,7 @@ async function syncTrades() {
     // Get last ~5000 blocks (~7 days)
     const latestHex = await rpcFetch('eth_blockNumber', []);
     const latest = parseInt(latestHex, 16);
-    const fromBlock = '0x' + Math.max(0, latest - 200000).toString(16);
+    const fromBlock = '0x' + Math.max(0, latest - 2000000).toString(16); // ~115 days
 
     const [logsIn, logsOut] = await Promise.all([
       rpcFetch('eth_getLogs', [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, safeTopicTo] }]),
@@ -844,7 +844,9 @@ async function syncTrades() {
         pair = `${outDec.sym} →`; amounts = `Sent ${outDec.amt} ${outDec.sym}`;
       } else return;
 
-      const tsMs = parseInt((inLog||outLog).blockNumber, 16) * 5000 + 1548000000000; // approx
+      // Celo mainnet: genesis ~April 2020 = 1587000000000ms, ~5s block time
+      const blockNum = parseInt((inLog||outLog).blockNumber, 16);
+      const tsMs = 1587000000000 + (blockNum * 5000);
       const timestamp = new Date(tsMs).toLocaleString();
       state.txHistory.push({ pair, amounts, hash, timestamp, tsMs, status: 'success', extra: {} });
     });
