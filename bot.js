@@ -315,22 +315,30 @@ async function checkFxStrategy() {
       // Buy the stable that is cheap (relative to real FX rate)
       const action = spread < 0 ? `BUY ${pair.stableSym} with ${tradeCELO} CELO` : `SELL ${pair.stableSym} for CELO`;
 
-      await sendTelegram(`💱 <b>FX OPPORTUNITY</b>\nPair: ${pair.stableSym}/CELO\nSpread: ${absSpread.toFixed(3)}%\nAction: ${action}`);
+      await sendTelegram(`💱 <b>FX OPPORTUNITY</b>\nPair: ${pair.stableSym}/cUSD\nSpread: ${absSpread.toFixed(3)}%\nAction: ${spread < 0 ? 'BUY ' + pair.stableSym + ' with cUSD' : 'SELL ' + pair.stableSym + ' for cUSD'}`);
 
       try {
+        const erc20 = ['function balanceOf(address) view returns (uint256)'];
+        const cusdContract = new ethers.Contract(TOKENS['cUSD'].address, erc20, provider);
+        const cusdBal = await cusdContract.balanceOf(wallet.address);
+        const cusdBalNum = parseFloat(ethers.utils.formatUnits(cusdBal, 18));
+
         if (spread < 0) {
-          // Stable is cheap — buy it with CELO
-          await executeSafeSwap('CELO', pair.stableSym, tradeCELO);
+          // Stable is cheap vs real FX — buy it with cUSD
+          if (cusdBalNum >= tradeUSD) {
+            await executeSafeSwap('cUSD', pair.stableSym, tradeUSD);
+          } else {
+            console.log(`Low cUSD balance: ${cusdBalNum.toFixed(2)} — skipping`);
+          }
         } else {
-          // Stable is expensive — check if we have it, sell for CELO
-          const erc20 = ['function balanceOf(address) view returns (uint256)'];
+          // Stable is expensive vs real FX — sell it back to cUSD
           const stableToken = TOKENS[pair.stableSym];
           if (!stableToken) continue;
           const stableContract = new ethers.Contract(stableToken.address, erc20, provider);
           const bal = await stableContract.balanceOf(wallet.address);
           const balNum = parseFloat(ethers.utils.formatUnits(bal, stableToken.decimals));
-          if (balNum >= parseFloat(tradeCELO)) {
-            await executeSafeSwap(pair.stableSym, 'CELO', tradeCELO);
+          if (balNum >= tradeUSD) {
+            await executeSafeSwap(pair.stableSym, 'cUSD', tradeUSD);
           }
         }
         totalFxYield += (tradeUSD * absSpread) / 100;
@@ -398,6 +406,7 @@ async function sendDailyReport() {
   } else {
     report += `🔄 Total trades: ${yTrades.length}\n`;
     report += `💰 Total volume: $${yVolume.toFixed(2)}\n`;
+    report += `💵 Capital per trade: $${CONFIG.FX_TRADE_SIZE_USD}\n`;
     report += `📈 Total FX yield: $${yYield.toFixed(4)}\n\n`;
     report += `<b>Trade Log:</b>\n`;
     yTrades.forEach(t => {
@@ -412,6 +421,8 @@ async function sendDailyReport() {
   report += `💰 Total volume: $${totalVolume.toFixed(2)}\n`;
   report += `📈 Total FX yield: $${totalYield.toFixed(4)}\n`;
   if (celoPrice > 0) report += `💎 CELO price: $${celoPrice.toFixed(4)}\n`;
+  report += `👛 Executor: ${CONFIG.EXECUTOR_ADDRESS}\n`;
+  report += `🔗 CeloScan: https://celoscan.io/address/${CONFIG.EXECUTOR_ADDRESS}`;
 
   await sendTelegram(report);
 }
