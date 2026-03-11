@@ -285,15 +285,10 @@ async function checkFxStrategy() {
   const tradeUSD = CONFIG.FX_TRADE_SIZE_USD;
   const tradeCELO = (tradeUSD / celoPrice).toFixed(2);
 
+  // Only trade pairs with reliable on-chain price data (GeckoTerminal)
   const pairs = [
     { name: 'EURUSD', stableSym: 'cEUR',  realRate: fxRates.EURUSD },
     { name: 'BRLUSD', stableSym: 'cREAL', realRate: fxRates.BRLUSD },
-    { name: 'GBPUSD', stableSym: 'cGBP',  realRate: fxRates.GBPUSD },
-    { name: 'KESUSD', stableSym: 'cKES',  realRate: fxRates.KESUSD },
-    { name: 'ZARUSD', stableSym: 'cZAR',  realRate: fxRates.ZARUSD },
-    { name: 'NGNUSD', stableSym: 'cNGN',  realRate: fxRates.NGNUSD },
-    { name: 'COPUSD', stableSym: 'cCOP',  realRate: fxRates.COPUSD },
-    { name: 'GHSUSD', stableSym: 'cGHS',  realRate: fxRates.GHSUSD },
   ];
 
   for (const pair of pairs) {
@@ -307,7 +302,7 @@ async function checkFxStrategy() {
 
     console.log(`FX ${pair.name}: spread=${spread.toFixed(3)}%`);
 
-    if (absSpread >= CONFIG.FX_MIN_SPREAD_PCT) {
+    if (absSpread >= CONFIG.FX_MIN_SPREAD_PCT && absSpread < 10) { // ignore if >10% (bad price data)
       const now = Date.now();
       if (lastFxTrade[pair.name] && now - lastFxTrade[pair.name] < 30 * 60 * 1000) continue;
       lastFxTrade[pair.name] = now;
